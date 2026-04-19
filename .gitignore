@@ -1,0 +1,22 @@
+.env
+.env.*
+!.env.example
+!**/.env.example
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+node_modules/
+frontend/dist/
+*.log
+.DS_Store
+backups/
+
+# Local sample / personal exports (keep out of git)
+*.pdf

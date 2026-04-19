@@ -1,0 +1,99 @@
+# Stack completo: PostgreSQL + API + panel (Nginx sirve el build de Vite y hace proxy de /api).
+#
+# Uso:
+#   cp backend/.env.example backend/.env   # rellena TELEGRAM_*, JWT_SECRET, OPENAI_API_KEY si aplica
+#   docker compose up --build
+#
+# Panel:  http://localhost:${WEB_HOST_PORT:-9080}  (8080 suele estar ocupado; sobreescribe si hace falta)
+# API directa (host): ${DIET_AGENT_HOST_PORT:-8020} → contenedor :8000 (evita choque con otros servicios en 8001)
+# Postgres solo en la red de Compose (servicio `db`). Para psql desde el host:
+#   docker compose exec db psql -U postgres -d diet_agent
+#
+# Webhook Telegram: servicio opcional `ngrok` → contenedor `web` (mismo tráfico que :9080).
+# Plan gratuito de ngrok = 1 sesión de agente. Si ya tienes otro contenedor ngrok (p. ej. version_simplificada),
+# detén ese antes: docker stop <nombre> && docker compose up -d ngrok
+# API local de ESTE agente: http://127.0.0.1:14040  |  sync: ./scripts/sync-telegram-webhook.sh
+# NGROK_AUTHTOKEN en backend/.env
+#
+# Datos demo (doctora + pacientes):
+#   docker compose exec backend python scripts/seed_demo.py
+#
+# PDF del plan: panel → Diets → abrir dieta → "Download PDF", o GET /api/diets/{id}/pdf (Bearer).
+#
+# Persistencia: el volumen `pgdata` guarda PostgreSQL entre reinicios. NO uses
+# `docker compose down -v` si quieres conservar pacientes, enlaces t.me de vinculación, etc.
+# (La URL pública del túnel ngrok puede cambiar; eso es solo para el webhook, no el deep link t.me.)
+# Copia de seguridad: con `db` en marcha → ./scripts/backup-db.sh
+#
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: diet_agent
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d diet_agent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/diet_agent
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:9080,http://127.0.0.1:9080,http://localhost:8020,http://127.0.0.1:8020
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DIET_AGENT_HOST_PORT:-8020}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${WEB_HOST_PORT:-9080}:80"
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: unless-stopped
+    depends_on:
+      - web
+    command:
+      - "http"
+      - "http://web:80"
+      - "--log=stdout"
+    env_file:
+      - ./backend/.env
+    ports:
+      - "127.0.0.1:14040:4040"
+
+volumes:
+  # Datos de diet_agent: conservar este volumen para no perder la BD al recrear contenedores.
+  pgdata:
