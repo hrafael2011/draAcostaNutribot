@@ -5,6 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.database import engine, Base
+import app.models  # noqa: F401 — registers all ORM models on Base.metadata
 
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -29,6 +31,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def create_tables() -> None:
+    """Create all database tables on startup if they don't already exist."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
 
 @app.get("/")
