@@ -22,9 +22,9 @@ def diet_generation_blockers(
         if not profile.objective:
             reasons.append("Missing profile objective")
         if not norm(profile.food_allergies):
-            reasons.append("Missing food_allergies (use 'none' if none)")
+            reasons.append("Faltan alergias alimentarias (escribe 'ninguna' si no aplica)")
         if not norm(profile.foods_avoided):
-            reasons.append("Missing foods_avoided (use 'none' if none)")
+            reasons.append("Faltan alimentos a evitar (escribe 'ninguno' si no aplica)")
     if not latest or latest.weight_kg is None:
         reasons.append("Missing latest weight (add a metric)")
     if not latest or latest.height_cm is None:

@@ -104,7 +104,7 @@ def diet_confirm_body(
 def diet_strategy_mode_prompt_message() -> str:
     return (
         "Elige cómo calcular los objetivos nutricionales del plan:\n"
-        "• Automático: el motor actual (por defecto).\n"
+        "• Automático: cálculo estándar (por defecto).\n"
         "• Guiado: estilo (p. ej. baja en carbohidratos) y preferencias de macros.\n"
         "• Manual: puedes fijar calorías y/o gramos de macros (con advertencias si aplica)."
     )

@@ -467,19 +467,23 @@ HELP_TEXT = (
     "• Puedes escribir en lenguaje natural, por ejemplo:\n"
     "  - 'quiero ver mis pacientes'\n"
     "  - 'genera una dieta para Carlos'\n"
-    "• Escribe 'cancelar' para salir de cualquier flujo y volver al menú.\n"
-    "• Los comandos /dieta y /pdf no están activos: usa el menú o el texto libre."
+    "• Escribe 'cancelar' para salir de cualquier flujo y volver al menú."
 )
 
 MSG_NO_DIETA_CMD = (
-    "La generación de dietas no usa comandos. "
+    "Para generar una dieta: "
     "Abre «Pacientes» en el menú, elige a alguien y «Generar dieta», "
     "o escribe por ejemplo: «genera una dieta para Maria»."
 )
 
 MSG_NO_PDF_CMD = (
-    "El PDF no se pide por comando. "
+    "Para obtener el PDF: "
     "Entra al paciente → «Historial dietas» y pulsa el botón de la dieta que quieras."
+)
+
+MSG_PANEL_ONLY_UPDATES = (
+    "Esta acción solo está disponible en el panel web. "
+    "Abre el paciente en el panel para actualizar ese dato."
 )
 
 
@@ -1271,12 +1275,6 @@ def _patient_actions_markup(patient_id: int) -> dict:
                 {"text": "Generar dieta", "callback_data": f"patient:diet:{patient_id}"},
                 {"text": "Historial dietas", "callback_data": f"patient:history:{patient_id}:1"},
             ],
-            [
-                {"text": "Actualizar peso", "callback_data": f"patient:weight:{patient_id}"},
-                {"text": "Actualizar estatura", "callback_data": f"patient:height:{patient_id}"},
-            ],
-            [{"text": "Actualizar ciudad", "callback_data": f"patient:city:{patient_id}"}],
-            [{"text": "Archivar", "callback_data": f"patient:archive:{patient_id}:ask"}],
         ]
     }
 
@@ -2215,44 +2213,11 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
             query = parts[3]
         await _send_patients_page(db, doctor, chat_id, page=max(1, page), query=query)
     elif len(parts) >= 3 and parts[:2] == ["patient", "weight"] and parts[2].isdigit():
-        patient_id = int(parts[2])
-        await _save_state(
-            db,
-            doctor.id,
-            channel_user_key,
-            {"awaiting": "weight_kg", "patient_id": patient_id},
-        )
-        await send_telegram_message(
-            chat_id,
-            "Envía el peso (kg, lb o solo el número en este paso). Ejemplos: 74,2 kg · 160 lb",
-            reply_markup=_cancel_markup(),
-        )
+        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 3 and parts[:2] == ["patient", "height"] and parts[2].isdigit():
-        patient_id = int(parts[2])
-        await _save_state(
-            db,
-            doctor.id,
-            channel_user_key,
-            {"awaiting": "height_cm", "patient_id": patient_id},
-        )
-        await send_telegram_message(
-            chat_id,
-            "Envía la estatura (cm, m o pies/pulgadas). Ejemplos: 168 cm · 1,75 m · 5 pies 8",
-            reply_markup=_cancel_markup(),
-        )
+        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 3 and parts[:2] == ["patient", "city"] and parts[2].isdigit():
-        patient_id = int(parts[2])
-        await _save_state(
-            db,
-            doctor.id,
-            channel_user_key,
-            {"awaiting": "city", "patient_id": patient_id},
-        )
-        await send_telegram_message(
-            chat_id,
-            "Envía la nueva ciudad del paciente.",
-            reply_markup=_cancel_markup(),
-        )
+        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 4 and parts[:2] == ["patient", "history"] and parts[2].isdigit():
         patient_id = int(parts[2])
         page = int(parts[3]) if parts[3].isdigit() else 1
@@ -2265,137 +2230,11 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
         and parts[1] == "confirm"
         and parts[2].isdigit()
     ):
-        patient_id = int(parts[2])
-        kind = parts[3] if len(parts) > 3 else ""
-        state = await _load_state(db, doctor.id, channel_user_key)
-        patient = await get_doctor_patient(db, doctor.id, patient_id)
-        if (
-            state.get("awaiting") != "metric_confirm"
-            or state.get("patient_id") != patient_id
-            or not patient
-        ):
-            await send_telegram_message(
-                chat_id,
-                "No hay una actualización pendiente. Vuelve a elegir al paciente.",
-                reply_markup=_menu_markup(),
-            )
-        elif kind == "weight":
-            w = state.get("pending_weight_kg")
-            if isinstance(w, (int, float)):
-                resume_after = state.get("resume_after")
-                instruction = state.get("instruction")
-                dur_resume = state.get("duration_days")
-                if not isinstance(dur_resume, int):
-                    dur_resume = DEFAULT_PLAN_DURATION_DAYS
-                await add_patient_metric(
-                    db, patient.id, weight_kg=float(w), source="telegram"
-                )
-                await _remember_patient_context(
-                    db, doctor.id, channel_user_key, patient.id
-                )
-                await _clear_state(db, doctor.id, channel_user_key)
-                if resume_after == "diet_confirm":
-                    restore_w: dict[str, Any] = {
-                        "awaiting": "diet_confirm",
-                        "patient_id": patient.id,
-                        "instruction": instruction if isinstance(instruction, str) else None,
-                        "duration_days": dur_resume,
-                    }
-                    restore_w.update(_diet_wizard_persist_slice(state))
-                    flow_rw = restore_w.get("strategy_flow", "new")
-                    is_reg_rw = flow_rw == "regen"
-                    summary_w = _diet_confirm_instruction_summary(restore_w)
-                    strat_w = strategy_summary_lines(restore_w)
-                    await _save_state(
-                        db,
-                        doctor.id,
-                        channel_user_key,
-                        restore_w,
-                    )
-                    await send_telegram_message(
-                        chat_id,
-                        f"Peso guardado: {float(w):.2f} kg.\n\n"
-                        "Ya puedo retomar la dieta.\n\n"
-                        + _diet_confirm_body(
-                            patient,
-                            instruction_summary=summary_w,
-                            duration_days=dur_resume,
-                            strategy_summary_lines=strat_w,
-                            is_regenerate=is_reg_rw,
-                        ),
-                        reply_markup=_diet_confirm_markup(patient.id),
-                    )
-                else:
-                    await send_telegram_message(
-                        chat_id,
-                        f"Peso guardado: {float(w):.2f} kg.",
-                        reply_markup=_menu_markup(),
-                    )
-            else:
-                await send_telegram_message(chat_id, MSG_NO_DATA)
-        elif kind == "height":
-            h = state.get("pending_height_cm")
-            if isinstance(h, (int, float)):
-                resume_after = state.get("resume_after")
-                instruction = state.get("instruction")
-                dur_resume = state.get("duration_days")
-                if not isinstance(dur_resume, int):
-                    dur_resume = DEFAULT_PLAN_DURATION_DAYS
-                await add_patient_metric(
-                    db, patient.id, height_cm=float(h), source="telegram"
-                )
-                await _remember_patient_context(
-                    db, doctor.id, channel_user_key, patient.id
-                )
-                await _clear_state(db, doctor.id, channel_user_key)
-                if resume_after == "diet_confirm":
-                    restore_h: dict[str, Any] = {
-                        "awaiting": "diet_confirm",
-                        "patient_id": patient.id,
-                        "instruction": instruction if isinstance(instruction, str) else None,
-                        "duration_days": dur_resume,
-                    }
-                    restore_h.update(_diet_wizard_persist_slice(state))
-                    flow_rh = restore_h.get("strategy_flow", "new")
-                    is_reg_rh = flow_rh == "regen"
-                    summary_h = _diet_confirm_instruction_summary(restore_h)
-                    strat_h = strategy_summary_lines(restore_h)
-                    await _save_state(
-                        db,
-                        doctor.id,
-                        channel_user_key,
-                        restore_h,
-                    )
-                    await send_telegram_message(
-                        chat_id,
-                        f"Estatura guardada: {float(h):.1f} cm.\n\n"
-                        "Ya puedo retomar la dieta.\n\n"
-                        + _diet_confirm_body(
-                            patient,
-                            instruction_summary=summary_h,
-                            duration_days=dur_resume,
-                            strategy_summary_lines=strat_h,
-                            is_regenerate=is_reg_rh,
-                        ),
-                        reply_markup=_diet_confirm_markup(patient.id),
-                    )
-                else:
-                    await send_telegram_message(
-                        chat_id,
-                        f"Estatura guardada: {float(h):.1f} cm.",
-                        reply_markup=_menu_markup(),
-                    )
-            else:
-                await send_telegram_message(chat_id, MSG_NO_DATA)
-        else:
-            await send_telegram_message(chat_id, MSG_NO_DATA)
+        await _clear_state(db, doctor.id, channel_user_key)
+        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 3 and parts[0] == "metric" and parts[1] == "cancel":
         await _clear_state(db, doctor.id, channel_user_key)
-        await send_telegram_message(
-            chat_id,
-            "Actualización de métrica cancelada.",
-            reply_markup=_menu_markup(),
-        )
+        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 3 and parts[:2] == ["patient", "diet"] and parts[2].isdigit():
         patient_id = int(parts[2])
         patient = await get_doctor_patient(db, doctor.id, patient_id)
@@ -2404,33 +2243,7 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
                 db, doctor, chat_id, channel_user_key, patient
             )
     elif len(parts) >= 4 and parts[:2] == ["patient", "archive"] and parts[2].isdigit():
-        patient_id = int(parts[2])
-        if parts[3] == "ask":
-            await send_telegram_message(
-                chat_id,
-                "Confirma archivo del paciente:",
-                reply_markup={
-                    "inline_keyboard": [
-                        [
-                            {
-                                "text": "Sí, archivar",
-                                "callback_data": f"patient:archive:{patient_id}:yes",
-                            },
-                            {
-                                "text": "Cancelar",
-                                "callback_data": f"patient:archive:{patient_id}:no",
-                            },
-                        ]
-                    ]
-                },
-            )
-        elif parts[3] == "yes":
-            patient = await get_doctor_patient(db, doctor.id, patient_id)
-            if patient:
-                await update_patient_fields(db, patient, archive=True)
-                await send_telegram_message(chat_id, "Paciente archivado correctamente.")
-        elif parts[3] == "no":
-            await send_telegram_message(chat_id, "Acción cancelada.")
+        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 3 and parts[:2] == ["patient", "select"] and parts[2].isdigit():
         patient_id = int(parts[2])
         patient = await get_doctor_patient(db, doctor.id, patient_id)
@@ -3047,92 +2860,9 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
             await _show_patient_card(db, doctor, chat_id, user_key, patient)
             return
         if intent == "possible_mutation":
-            hint = _patient_name_hint(text, entities)
-            if not hint.strip():
-                last_patient = await _last_active_patient(db, doctor, user_key)
-                if last_patient is None:
-                    await send_telegram_message(
-                        chat_id,
-                        "Indica el nombre o número del paciente junto al dato a actualizar.",
-                    )
-                    return
-                patient = last_patient
-            else:
-                patient, err, amb = await _resolve_patient_for_doctor(db, doctor, hint)
-                if amb is not None:
-                    await _send_ambiguous_patient_buttons(chat_id, amb)
-                    return
-                if err or patient is None:
-                    await send_telegram_message(chat_id, err or MSG_NO_DATA)
-                    return
-            await _remember_patient_context(db, doctor.id, user_key, patient.id)
-            pw = parse_weight(text)
-            ph = parse_height(text)
-            ok_w = (
-                pw
-                and pw.field == "weight_kg"
-                and measurement_in_reasonable_range(pw)
-            )
-            ok_h = (
-                ph
-                and ph.field == "height_cm"
-                and measurement_in_reasonable_range(ph)
-            )
-            if ok_w and ok_h:
-                await send_telegram_message(
-                    chat_id,
-                    "Indica solo peso o solo estatura en el mismo mensaje.",
-                )
-                return
-            if ok_w:
-                await _queue_metric_confirmation(
-                    db,
-                    doctor,
-                    chat_id,
-                    user_key,
-                    patient,
-                    weight_kg=pw.normalized_value,
-                )
-                return
-            if ok_h:
-                await _queue_metric_confirmation(
-                    db,
-                    doctor,
-                    chat_id,
-                    user_key,
-                    patient,
-                    height_cm=ph.normalized_value,
-                )
-                return
-            if _is_height_request(text):
-                await _save_state(
-                    db,
-                    doctor.id,
-                    user_key,
-                    {"awaiting": "height_cm", "patient_id": patient.id},
-                )
-                await send_telegram_message(
-                    chat_id,
-                    f"Perfecto. Envíame la estatura de {patient.first_name} {patient.last_name} en cm, m o pies/pulgadas.",
-                    reply_markup=_cancel_markup(),
-                )
-                return
-            if _is_weight_request(text):
-                await _save_state(
-                    db,
-                    doctor.id,
-                    user_key,
-                    {"awaiting": "weight_kg", "patient_id": patient.id},
-                )
-                await send_telegram_message(
-                    chat_id,
-                    f"Perfecto. Envíame el peso de {patient.first_name} {patient.last_name} en kg, lb o solo el número.",
-                    reply_markup=_cancel_markup(),
-                )
-                return
             await send_telegram_message(
                 chat_id,
-                "Indica peso o estatura con unidad (ej: 72 kg, 165 cm, 160 lb).",
+                "Las actualizaciones de peso, estatura, ciudad y archivo se realizan solo en el panel web.",
             )
             return
         if policy == "ambiguous_entity":

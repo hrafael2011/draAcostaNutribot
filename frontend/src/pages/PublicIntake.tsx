@@ -1,13 +1,30 @@
-import { type CSSProperties, FormEvent, useEffect, useState } from "react"
+import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "react"
 import { useParams } from "react-router-dom"
 import { submitIntakeForm, validateIntakeToken } from "../services/api"
 import type { IntakePublicMeta } from "../types"
+
+const COUNTRY_CITIES: Record<string, string[]> = {
+  "República Dominicana": ["Santo Domingo", "Santiago", "La Romana", "San Pedro de Macorís", "Punta Cana"],
+  Mexico: ["Ciudad de México", "Guadalajara", "Monterrey", "Puebla", "Mérida"],
+  Colombia: ["Bogotá", "Medellín", "Cali", "Barranquilla", "Cartagena"],
+  "Costa Rica": ["San José", "Alajuela", "Heredia", "Cartago", "Liberia"],
+  USA: ["Miami", "New York", "Los Angeles", "Houston", "Orlando"],
+}
+
+const WEIGHT_LB_TO_KG = 0.45359237
+const IN_TO_CM = 2.54
 
 export default function PublicIntake() {
   const { token } = useParams()
   const [meta, setMeta] = useState<IntakePublicMeta | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const [country, setCountry] = useState("")
+  const [city, setCity] = useState("")
+  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg")
+  const [heightUnit, setHeightUnit] = useState<"cm" | "ftin">("cm")
+
+  const cityOptions = useMemo(() => COUNTRY_CITIES[country] || [], [country])
 
   useEffect(() => {
     if (!token) return
@@ -40,18 +57,37 @@ export default function PublicIntake() {
       const n = Number(v)
       return Number.isFinite(n) ? n : null
     }
+    const weightRaw = Number(str("weight_value"))
+    const heightCmRaw = Number(str("height_cm_value"))
+    const heightFt = Number(str("height_ft_value"))
+    const heightIn = Number(str("height_in_value") || "0")
+
+    const weightKg =
+      Number.isFinite(weightRaw) && weightRaw > 0
+        ? weightUnit === "kg"
+          ? weightRaw
+          : weightRaw * WEIGHT_LB_TO_KG
+        : NaN
+
+    const heightCm =
+      heightUnit === "cm"
+        ? heightCmRaw
+        : Number.isFinite(heightFt) && heightFt > 0
+          ? (heightFt * 12 + (Number.isFinite(heightIn) ? heightIn : 0)) * IN_TO_CM
+          : NaN
+
     const body: Record<string, unknown> = {
       first_name: str("first_name"),
       last_name: str("last_name"),
       birth_date: str("birth_date"),
       sex: str("sex"),
-      country: str("country"),
-      city: str("city"),
+      country,
+      city: city || str("city_other"),
       objective: str("objective"),
       food_allergies: str("food_allergies"),
       foods_avoided: str("foods_avoided"),
-      weight_kg: num("weight_kg", true),
-      height_cm: num("height_cm", true),
+      weight_kg: weightKg,
+      height_cm: heightCm,
       whatsapp: optStr("whatsapp"),
       email: optStr("email") || null,
       diseases: optStr("diseases"),
@@ -77,8 +113,12 @@ export default function PublicIntake() {
       leg_cm: num("leg_cm", false),
       calf_cm: num("calf_cm", false),
     }
+    if (!country || !(city || str("city_other"))) {
+      setError("Country and city are required")
+      return
+    }
     if (!Number.isFinite(body.weight_kg as number) || !Number.isFinite(body.height_cm as number)) {
-      setError("Weight and height are required")
+      setError("Weight and height are required in valid units")
       return
     }
     setError(null)
@@ -157,15 +197,58 @@ export default function PublicIntake() {
         <label style={{ fontSize: 13 }}>WhatsApp</label>
         <input name="whatsapp" style={input} />
         <label style={{ fontSize: 13 }}>Country *</label>
-        <input name="country" required style={input} />
+        <select value={country} onChange={(e) => { setCountry(e.target.value); setCity("") }} required style={input}>
+          <option value="">Select country</option>
+          {Object.keys(COUNTRY_CITIES).map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
         <label style={{ fontSize: 13 }}>City *</label>
-        <input name="city" required style={input} />
+        {cityOptions.length > 0 ? (
+          <select value={city} onChange={(e) => setCity(e.target.value)} required style={input}>
+            <option value="">Select city</option>
+            {cityOptions.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+            <option value="__other">Other city</option>
+          </select>
+        ) : (
+          <input name="city_other" required style={input} placeholder="Type city" />
+        )}
+        {city === "__other" && (
+          <input name="city_other" required style={input} placeholder="Type city" />
+        )}
 
         <h2 style={{ fontSize: 16 }}>Measurements *</h2>
-        <label style={{ fontSize: 13 }}>Weight (kg) *</label>
-        <input name="weight_kg" type="number" step="0.1" required style={input} />
-        <label style={{ fontSize: 13 }}>Height (cm) *</label>
-        <input name="height_cm" type="number" step="0.1" required style={input} />
+        <label style={{ fontSize: 13 }}>Weight unit *</label>
+        <select value={weightUnit} onChange={(e) => setWeightUnit(e.target.value as "kg" | "lb")} style={input}>
+          <option value="kg">kg</option>
+          <option value="lb">lb</option>
+        </select>
+        <label style={{ fontSize: 13 }}>Weight ({weightUnit}) *</label>
+        <input name="weight_value" type="number" step="0.1" required style={input} />
+        <label style={{ fontSize: 13 }}>Height unit *</label>
+        <select value={heightUnit} onChange={(e) => setHeightUnit(e.target.value as "cm" | "ftin")} style={input}>
+          <option value="cm">cm</option>
+          <option value="ftin">feet + inches</option>
+        </select>
+        {heightUnit === "cm" ? (
+          <>
+            <label style={{ fontSize: 13 }}>Height (cm) *</label>
+            <input name="height_cm_value" type="number" step="0.1" required style={input} />
+          </>
+        ) : (
+          <>
+            <label style={{ fontSize: 13 }}>Height (feet) *</label>
+            <input name="height_ft_value" type="number" step="1" required style={input} />
+            <label style={{ fontSize: 13 }}>Height (inches)</label>
+            <input name="height_in_value" type="number" step="1" style={input} />
+          </>
+        )}
         <label style={{ fontSize: 13 }}>Neck (cm)</label>
         <input name="neck_cm" type="number" step="0.1" style={input} />
         <label style={{ fontSize: 13 }}>Chest (cm)</label>
@@ -191,10 +274,16 @@ export default function PublicIntake() {
         <label style={{ fontSize: 13 }}>Foods avoided * (or &quot;none&quot;)</label>
         <input name="foods_avoided" required style={input} />
         <label style={{ fontSize: 13 }}>Medical history</label>
+        <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
+          Include diagnoses, surgeries, relevant events and current follow-up.
+        </p>
         <textarea name="medical_history" rows={2} style={{ ...input, minHeight: 48 }} />
         <label style={{ fontSize: 13 }}>Dietary style</label>
         <input name="dietary_style" style={input} />
         <label style={{ fontSize: 13 }}>Foods you like</label>
+        <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
+          Be specific: preferred proteins, carbs, vegetables, fruits and usual preparations.
+        </p>
         <textarea name="food_preferences" rows={2} style={{ ...input, minHeight: 48 }} />
         <label style={{ fontSize: 13 }}>Foods you dislike</label>
         <textarea name="disliked_foods" rows={2} style={{ ...input, minHeight: 48 }} />
@@ -212,7 +301,10 @@ export default function PublicIntake() {
         <input name="sleep_hours" type="number" step="0.1" style={input} />
         <label style={{ fontSize: 13 }}>Budget level</label>
         <input name="budget_level" placeholder="e.g. medium" style={input} />
-        <label style={{ fontSize: 13 }}>Adherence (1–5)</label>
+        <label style={{ fontSize: 13 }}>Expected adherence (1–5)</label>
+        <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
+          1 = very hard to follow, 5 = very likely to follow consistently.
+        </p>
         <input name="adherence_level" type="number" style={input} />
         <label style={{ fontSize: 13 }}>Exercise days / week</label>
         <input name="exercise_frequency_per_week" type="number" style={input} />

@@ -1,4 +1,4 @@
-"""Texto largo de vistas previa de dieta en Telegram (sin estado ni red)."""
+"""Resumen de vista previa de dieta en Telegram (sin estado ni red)."""
 
 from __future__ import annotations
 
@@ -80,6 +80,7 @@ def format_diet_preview_message(
     if isinstance(days, list) and days:
         d0 = days[0]
         if isinstance(d0, dict):
+            sample_items = 0
             lines.extend(["", "Muestra del día 1:"])
             for _, label, raw in extract_day_meals(
                 d0,
@@ -88,21 +89,24 @@ def format_diet_preview_message(
                 if not raw:
                     continue
                 s = str(raw).strip()
-                if len(s) > 160:
-                    s = s[:157] + "…"
+                if len(s) > 120:
+                    s = s[:117] + "…"
                 lines.append(f"• {label}: {s}")
+                sample_items += 1
+                if sample_items >= 2:
+                    break
     recs = plan.get("recommendations")
-    lines.extend(["", "Recomendaciones clave:"])
+    lines.extend(["", "Recomendaciones clave (resumen):"])
     if isinstance(recs, list):
-        for item in recs[:5]:
+        for item in recs[:3]:
             if isinstance(item, str) and item.strip():
                 s = item.strip()
-                if len(s) > 190:
-                    s = s[:187] + "…"
+                if len(s) > 140:
+                    s = s[:137] + "…"
                 lines.append(f"• {s}")
     elif isinstance(recs, str) and recs.strip():
         s = recs.strip()
-        lines.append(f"• {s[:400]}{'…' if len(s) > 400 else ''}")
+        lines.append(f"• {s[:220]}{'…' if len(s) > 220 else ''}")
     else:
         lines.append("• (sin bloque de recomendaciones en el plan)")
     if doctor_note and doctor_note.strip():
@@ -117,7 +121,7 @@ def format_diet_preview_message(
     lines.extend(
         [
             "",
-            "Revisa el resumen. Si apruebas, envío el PDF final con el detalle completo.",
+            "Revisa este resumen breve. Si apruebas, envío el PDF final con el detalle completo.",
         ]
     )
     out = "\n".join(lines)

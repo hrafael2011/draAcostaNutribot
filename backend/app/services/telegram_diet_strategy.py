@@ -87,7 +87,7 @@ def strategy_summary_lines(state: dict[str, Any]) -> list[str]:
     lines.append(f"Comidas por día: {meals_per_day}.")
     lines.append(f"Estructura diaria: {meal_structure_summary_es(slots)}.")
     if sm == "auto":
-        lines.append("Modo nutricional: Automático (motor actual).")
+        lines.append("Modo nutricional: Automático (cálculo estándar).")
         return lines
     if sm == "guided":
         lines.append("Modo nutricional: Guiado.")
@@ -110,7 +110,7 @@ def strategy_summary_lines(state: dict[str, Any]) -> list[str]:
         if prefs:
             lines.append("Preferencias de macros: " + "; ".join(prefs) + ".")
         else:
-            lines.append("Preferencias de macros: predeterminadas del motor.")
+            lines.append("Preferencias de macros: predeterminadas del sistema.")
         return lines
     # manual
     lines.append("Modo nutricional: Manual.")
@@ -130,6 +130,6 @@ def strategy_summary_lines(state: dict[str, Any]) -> list[str]:
         lines.append("Objetivos manuales: " + ", ".join(parts) + ".")
     else:
         lines.append(
-            "Objetivos manuales: solo orientación del motor (sin cifras fijadas)."
+            "Objetivos manuales: orientación automática (sin cifras fijadas)."
         )
     return lines

@@ -1,4 +1,4 @@
-"""Extracción legible de bloques del motor desde structured_plan_json (planes nuevos y legacy)."""
+"""Extracción legible de bloques de cálculo nutricional desde structured_plan_json."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ def nutrition_engine_text_lines(plan: Any) -> list[str]:
     lines: list[str] = []
     ver = ne.get("engine_schema_version")
     if ver:
-        lines.append(f"Motor nutricional (esquema {ver})")
+        lines.append(f"Cálculo nutricional (esquema {ver})")
     else:
-        lines.append("Motor nutricional (calculado)")
+        lines.append("Cálculo nutricional (estimado)")
     if ne.get("bmr_kcal") is not None:
         lines.append(f"· TMB estimada: {ne['bmr_kcal']} kcal/día")
     if ne.get("tdee_kcal") is not None:
