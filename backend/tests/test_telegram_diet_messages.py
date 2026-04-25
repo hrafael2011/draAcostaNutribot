@@ -3,7 +3,11 @@ from datetime import date
 import pytest
 
 from app.models import Diet, Patient
-from app.services.telegram_diet_messages import format_diet_preview_message
+from app.services.telegram_diet_messages import (
+    format_diet_preview_message,
+    format_telegram_full_day_block,
+    split_telegram_text_chunks,
+)
 
 
 def test_format_diet_preview_includes_title_and_patient():
@@ -92,3 +96,31 @@ def test_format_diet_preview_shows_expected_meal_structure(
     assert "Muestra del día 1:" in text
     for token in expected_tokens:
         assert token in text
+
+
+def test_split_telegram_text_chunks_respects_max_len():
+    s = "x" * 10000
+    parts = split_telegram_text_chunks(s, 4000)
+    assert all(len(p) <= 4000 for p in parts)
+    assert "".join(parts) == s
+
+
+def test_format_telegram_full_day_block_shows_slotted_meals():
+    plan = {
+        "meals_per_day": 2,
+        "meal_slots": ["breakfast", "dinner"],
+        "days": [
+            {
+                "day": 1,
+                "date": "2026-01-01",
+                "meals": {
+                    "breakfast": "Tostada",
+                    "dinner": "Pescado",
+                },
+            }
+        ],
+    }
+    out = format_telegram_full_day_block(plan, 0, num_days=1)
+    assert "Día 1" in out
+    assert "Tostada" in out
+    assert "Pescado" in out

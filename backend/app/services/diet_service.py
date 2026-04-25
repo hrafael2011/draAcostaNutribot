@@ -77,6 +77,17 @@ async def load_patient_bundle(
     return patient, profile, metrics
 
 
+async def _diet_for_update(
+    db: AsyncSession, diet_id: int, doctor_id: int
+) -> Optional[Diet]:
+    result = await db.execute(
+        select(Diet)
+        .where(Diet.id == diet_id, Diet.doctor_id == doctor_id)
+        .with_for_update()
+    )
+    return result.scalar_one_or_none()
+
+
 def build_snapshot(
     patient: Patient,
     profile: Optional[PatientProfile],
@@ -283,8 +294,8 @@ async def approve_diet_preview(
     doctor: Doctor,
     diet_id: int,
 ) -> Diet:
-    diet = await db.get(Diet, diet_id)
-    if diet is None or diet.doctor_id != doctor.id:
+    diet = await _diet_for_update(db, diet_id, doctor.id)
+    if diet is None:
         raise DietGenerationError("not_found", "Diet not found")
     if diet.status != "pending_approval":
         raise DietGenerationError(
@@ -310,8 +321,8 @@ async def discard_diet_preview(
     doctor: Doctor,
     diet_id: int,
 ) -> Diet:
-    diet = await db.get(Diet, diet_id)
-    if diet is None or diet.doctor_id != doctor.id:
+    diet = await _diet_for_update(db, diet_id, doctor.id)
+    if diet is None:
         raise DietGenerationError("not_found", "Diet not found")
     if diet.status != "pending_approval":
         raise DietGenerationError(
@@ -346,8 +357,8 @@ async def regenerate_diet(
     macro_mode: Optional[dict[str, Any]] = None,
     manual_targets: Optional[dict[str, Any]] = None,
 ) -> Diet:
-    diet = await db.get(Diet, diet_id)
-    if diet is None or diet.doctor_id != doctor.id:
+    diet = await _diet_for_update(db, diet_id, doctor.id)
+    if diet is None:
         raise DietGenerationError("not_found", "Diet not found")
 
     resolved_duration = (

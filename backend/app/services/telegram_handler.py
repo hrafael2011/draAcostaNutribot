@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+import inspect
 import re
 from typing import Any, Optional
 
@@ -46,8 +48,15 @@ from app.services.measurement_parser import (
 )
 from app.services.telegram_intent_service import classify_intent_llm, rule_based_intent
 from app.services.diet_export import build_diet_export_pdf_bytes
+from app.services.plan_meals import (
+    meal_slot_label_es,
+    normalize_plan_meal_metadata,
+    resolve_plan_meal_slots,
+)
 from app.services.telegram_diet_messages import (
     format_diet_preview_message as _format_diet_preview_message,
+    format_telegram_full_day_block,
+    split_telegram_text_chunks,
 )
 from app.services.telegram_diet_strategy import (
     STYLE_CODE_TO_API,
@@ -88,6 +97,7 @@ from app.services.diet_service import (
 )
 from app.services.telegram_client import (
     answer_telegram_callback_query,
+    edit_telegram_message_reply_markup,
     send_telegram_document,
     send_telegram_message,
 )
@@ -488,23 +498,184 @@ MSG_PANEL_ONLY_UPDATES = (
 
 
 async def _load_state(db: AsyncSession, doctor_id: int, channel_user_key: str) -> dict:
-    result = await db.execute(
-        select(ConversationState).where(
-            ConversationState.doctor_id == doctor_id,
-            ConversationState.channel_user_key == channel_user_key,
-        )
+    return await _load_state_with_lock(
+        db, doctor_id, channel_user_key, for_update=False
     )
+
+
+async def _load_state_with_lock(
+    db: AsyncSession,
+    doctor_id: int,
+    channel_user_key: str,
+    *,
+    for_update: bool,
+) -> dict:
+    stmt = select(ConversationState).where(
+        ConversationState.doctor_id == doctor_id,
+        ConversationState.channel_user_key == channel_user_key,
+    )
+    if for_update:
+        stmt = stmt.with_for_update()
+    result = await db.execute(stmt)
     row = result.scalar_one_or_none()
     if not row or not isinstance(row.context_data, dict):
         return {}
     return dict(row.context_data)
 
 
+async def _load_state_for_update(
+    db: AsyncSession, doctor_id: int, channel_user_key: str
+) -> dict:
+    try:
+        return await _load_state_with_lock(
+            db, doctor_id, channel_user_key, for_update=True
+        )
+    except TypeError:
+        # Test doubles may not implement awaitable db.execute(); fall back to plain load.
+        return await _load_state(db, doctor_id, channel_user_key)
+
+
+def _callback_message_id(message: dict[str, Any]) -> int | None:
+    mid = message.get("message_id")
+    return mid if isinstance(mid, int) else None
+
+
+def _state_message_matches(
+    state: dict[str, Any],
+    *,
+    key: str,
+    message: dict[str, Any],
+) -> bool:
+    expected = state.get(key)
+    if expected is None:
+        return True
+    return isinstance(expected, int) and expected == _callback_message_id(message)
+
+
+def _drop_state_keys(state: dict[str, Any], *keys: str) -> dict[str, Any]:
+    out = dict(state)
+    for key in keys:
+        out.pop(key, None)
+    return out
+
+
+async def _send_diet_confirm_prompt(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    patient: Patient,
+    *,
+    body: str,
+) -> None:
+    mid = await send_telegram_message(
+        chat_id,
+        body,
+        reply_markup=_diet_confirm_markup(patient.id),
+    )
+    payload: dict[str, Any] = {
+        "confirm_message_id": mid,
+        "wizard_inline_message_id": None,
+    }
+    if mid is None:
+        payload["confirm_message_id"] = None
+    await _save_state(db, doctor.id, channel_user_key, payload)
+
+
+async def _send_diet_preview_and_store_state(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    diet: Diet,
+    patient: Patient,
+    *,
+    doctor_note: Optional[str],
+) -> None:
+    preview = _format_diet_preview_message(
+        diet, patient, doctor_note=doctor_note
+    )
+    mid = await send_telegram_message(
+        chat_id,
+        preview,
+        reply_markup=_diet_preview_markup(diet.id),
+    )
+    await _save_state(
+        db,
+        doctor.id,
+        channel_user_key,
+        {
+            "awaiting": "diet_preview",
+            "pending_diet_id": diet.id,
+            "patient_id": patient.id,
+            "preview_message_id": mid,
+            "quick_adjust_message_id": None,
+            "confirm_message_id": None,
+            "wizard_inline_message_id": None,
+            "wizard_back_step": None,
+            "edit_day_message_id": None,
+            "edit_slot_message_id": None,
+        },
+    )
+
+
+async def _send_wizard_inline_prompt(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    text: str,
+    reply_markup: dict[str, Any],
+    state_patch: Optional[dict[str, Any]] = None,
+) -> None:
+    mid = await send_telegram_message(
+        chat_id,
+        text,
+        reply_markup=reply_markup,
+    )
+    payload: dict[str, Any] = {
+        "wizard_inline_message_id": mid,
+        "confirm_message_id": None,
+    }
+    if state_patch:
+        payload = {**state_patch, **payload}
+    await _save_state(
+        db,
+        doctor.id,
+        channel_user_key,
+        payload,
+    )
+
+
+async def _send_diet_quick_adjust_menu(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    diet_id: int,
+) -> None:
+    mid = await send_telegram_message(
+        chat_id,
+        "Elige un ajuste rápido. Se regenerará el plan con ese cambio "
+        "(se conserva tu nota clínica previa cuando aplica).",
+        reply_markup=_diet_quick_adjust_markup(diet_id),
+    )
+    await _save_state(
+        db,
+        doctor.id,
+        channel_user_key,
+        {"quick_adjust_message_id": mid},
+    )
+
 async def _save_state(
     db: AsyncSession, doctor_id: int, channel_user_key: str, data: dict
 ) -> None:
     prev = await _load_state(db, doctor_id, channel_user_key)
     merged = {**prev, **data}
+    execute = getattr(db, "execute", None)
+    if not callable(execute) or not inspect.iscoroutinefunction(execute):
+        return
     result = await db.execute(
         select(ConversationState).where(
             ConversationState.doctor_id == doctor_id,
@@ -530,6 +701,7 @@ async def _clear_state(db: AsyncSession, doctor_id: int, channel_user_key: str) 
     keep_data = {
         "welcome_shown": prev.get("welcome_shown"),
         "last_active_patient_id": prev.get("last_active_patient_id"),
+        "active_patient_id": prev.get("active_patient_id"),
     }
     await db.execute(
         delete(ConversationState).where(
@@ -549,8 +721,305 @@ async def _remember_patient_context(
         db,
         doctor_id,
         channel_user_key,
-        {"last_active_patient_id": patient_id},
+        {
+            "last_active_patient_id": patient_id,
+            "active_patient_id": patient_id,
+        },
     )
+
+
+def _preview_session_matches(state: dict, diet_id: int) -> bool:
+    return state.get("awaiting") == "diet_preview" and state.get(
+        "pending_diet_id"
+    ) == diet_id
+
+
+# Pasos del asistente de dieta (mismo paciente): bloquear relanzar «Generar dieta».
+_ACTIVE_DIET_WIZARD_AWAITING: frozenset[str] = frozenset(
+    {
+        "diet_note_offer",
+        "diet_duration",
+        "diet_instruction",
+        "diet_meals_per_day",
+        "diet_strategy_mode",
+        "diet_strategy_style",
+        "diet_macro_protein",
+        "diet_macro_carbs",
+        "diet_macro_fat",
+        "diet_manual_kcal",
+        "diet_manual_protein_g",
+        "diet_manual_carbs_g",
+        "diet_manual_fat_g",
+        "diet_confirm",
+        "diet_preview",
+        "diet_regenerate_duration",
+        "diet_regenerate_note",
+        "diet_tg_edit_meal",
+    }
+)
+
+
+def _has_active_diet_wizard_for_patient(state: dict, patient_id: int) -> bool:
+    aw = state.get("awaiting")
+    if aw not in _ACTIVE_DIET_WIZARD_AWAITING:
+        return False
+    pid = state.get("patient_id")
+    return isinstance(pid, int) and pid == patient_id
+
+
+def _patient_switch_confirm_markup(
+    action: str, patient_id: int, extra: str
+) -> dict:
+    safe_extra = extra if extra else "_"
+    return {
+        "inline_keyboard": [
+            [
+                {
+                    "text": "Sí",
+                    "callback_data": f"flow:pswitch:yes:{action}:{patient_id}:{safe_extra}",
+                },
+                {"text": "No", "callback_data": "flow:pswitch:no"},
+            ]
+        ]
+    }
+
+
+async def _send_stale_step_refresh(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    prefix: str = "Este paso ya no aplica.",
+) -> None:
+    state = await _load_state(db, doctor.id, channel_user_key)
+    awaiting = state.get("awaiting")
+    patient_id = state.get("patient_id")
+    pending_diet_id = state.get("pending_diet_id")
+    if awaiting == "diet_preview" and isinstance(pending_diet_id, int):
+        diet = await get_doctor_diet(db, doctor.id, pending_diet_id)
+        patient = None
+        if diet:
+            patient = await get_doctor_patient(db, doctor.id, diet.patient_id)
+        if diet and patient:
+            await _send_diet_preview_and_store_state(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                diet,
+                patient,
+                doctor_note=diet.notes,
+            )
+            return
+        await send_telegram_message(
+            chat_id,
+            f"{prefix} Te muestro la vista previa vigente.",
+            reply_markup=_diet_preview_markup(pending_diet_id),
+        )
+        return
+    if awaiting == "diet_note_offer" and isinstance(patient_id, int):
+        default_note = (
+            "¿Quieres agregar una nota o especificaciones extra para orientar la generación "
+            "de la dieta? Es opcional."
+        )
+        body = prefix.strip() if prefix.strip() else default_note
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=body,
+            reply_markup=_diet_note_offer_markup(patient_id),
+        )
+        return
+    if awaiting == "diet_duration" and isinstance(patient_id, int):
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Continúa con la duración.",
+            reply_markup=_diet_duration_choice_markup(patient_id),
+        )
+        return
+    if awaiting == "diet_regenerate_duration" and isinstance(pending_diet_id, int):
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Indica de nuevo la duración del plan.",
+            reply_markup=_diet_regen_duration_choice_markup(pending_diet_id),
+        )
+        return
+    if awaiting == "diet_meals_per_day" and isinstance(patient_id, int):
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Continúa con comidas por día.",
+            reply_markup=_diet_meals_choice_markup(patient_id),
+        )
+        return
+    if awaiting == "diet_strategy_mode" and isinstance(patient_id, int):
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Continúa con el modo nutricional.",
+            reply_markup=_diet_strategy_mode_markup(patient_id),
+        )
+        return
+    if awaiting == "diet_strategy_style" and isinstance(patient_id, int):
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Continúa con el estilo de dieta.",
+            reply_markup=_diet_strategy_style_markup(patient_id),
+        )
+        return
+    if awaiting == "diet_confirm" and isinstance(patient_id, int):
+        patient = await get_doctor_patient(db, doctor.id, patient_id)
+        if patient:
+            await _send_diet_confirm_prompt(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                patient,
+                body=f"{prefix} Usa los botones de confirmación vigentes abajo.",
+            )
+        else:
+            await send_telegram_message(chat_id, prefix, reply_markup=_menu_markup())
+        return
+    if awaiting in {
+        "diet_instruction",
+        "diet_regenerate_note",
+        "diet_edit_text",
+        "diet_tg_edit_meal",
+        "search_query",
+    }:
+        await send_telegram_message(
+            chat_id,
+            f"{prefix} Continúa desde el paso actual.",
+            reply_markup=_cancel_markup(),
+        )
+        return
+    if awaiting == "diet_macro_protein":
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Continúa con la proteína del plan.",
+            reply_markup=_diet_macro_protein_markup(),
+        )
+        return
+    if awaiting == "diet_macro_carbs":
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Continúa con los hidratos del plan.",
+            reply_markup=_diet_macro_carbs_markup(),
+        )
+        return
+    if awaiting == "diet_macro_fat":
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            text=f"{prefix} Continúa con las grasas del plan.",
+            reply_markup=_diet_macro_fat_markup(),
+        )
+        return
+    if awaiting == "diet_manual_kcal":
+        await send_telegram_message(
+            chat_id,
+            (f"{prefix} " if prefix else "")
+            + _diet_manual_kcal_prompt_message(),
+            reply_markup=_cancel_markup(),
+        )
+        return
+    if awaiting == "diet_manual_protein_g":
+        await send_telegram_message(
+            chat_id,
+            (f"{prefix} " if prefix else "")
+            + _diet_manual_protein_prompt_message(),
+            reply_markup=_cancel_markup(),
+        )
+        return
+    if awaiting == "diet_manual_carbs_g":
+        await send_telegram_message(
+            chat_id,
+            (f"{prefix} " if prefix else "")
+            + _diet_manual_carbs_prompt_message(),
+            reply_markup=_cancel_markup(),
+        )
+        return
+    if awaiting == "diet_manual_fat_g":
+        await send_telegram_message(
+            chat_id,
+            (f"{prefix} " if prefix else "")
+            + _diet_manual_fat_prompt_message(),
+            reply_markup=_cancel_markup(),
+        )
+        return
+    await send_telegram_message(chat_id, prefix, reply_markup=_menu_markup())
+
+
+async def _guard_active_patient_switch(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    target_patient_id: int,
+    action: str,
+    extra: str = "_",
+) -> bool:
+    state = await _load_state(db, doctor.id, channel_user_key)
+    active = state.get("active_patient_id")
+    if not isinstance(active, int) or active == target_patient_id:
+        return True
+    target = await get_doctor_patient(db, doctor.id, target_patient_id)
+    if not target:
+        await send_telegram_message(chat_id, "Paciente no encontrado.")
+        return False
+    await _save_state(
+        db,
+        doctor.id,
+        channel_user_key,
+        {
+            "pending_switch_patient_id": target_patient_id,
+            "pending_switch_action": action,
+            "pending_switch_extra": extra,
+        },
+    )
+    await send_telegram_message(
+        chat_id,
+        f"Actualmente trabajas con otro paciente. ¿Confirmar cambio a {target.first_name} {target.last_name}?",
+        reply_markup=_patient_switch_confirm_markup(
+            action, target_patient_id, extra
+        ),
+    )
+    return False
+
+
+async def _try_strip_callback_inline_keyboard(
+    chat_id: str, message: dict[str, Any]
+) -> None:
+    mid = message.get("message_id")
+    if not isinstance(mid, int):
+        return
+    await edit_telegram_message_reply_markup(chat_id, mid, reply_markup=None)
 
 
 async def _last_active_patient(
@@ -581,6 +1050,420 @@ def _cancel_markup() -> dict:
     }
 
 
+def _navigation_callback_requires_fresh_message(data: str) -> bool:
+    return (
+        data.startswith("menu:")
+        or data.startswith("patient:")
+        or data.startswith("nav:")
+    )
+
+
+def _should_strip_inline_after_callback(data: str) -> bool:
+    return (
+        data.startswith("nav:")
+        or data.startswith("menu:")
+        or data.startswith("patient:")
+        or data.startswith("diet:")
+        or data.startswith("flow:pswitch")
+    )
+
+
+def _navigation_footer_markup(
+    *,
+    include_back: bool = True,
+    home_label: str = "Inicio",
+) -> list[list[dict[str, str]]]:
+    rows: list[list[dict[str, str]]] = []
+    if include_back:
+        rows.append(
+            [
+                {"text": "⬅ Volver", "callback_data": "nav:back"},
+                {"text": home_label, "callback_data": "nav:home"},
+            ]
+        )
+    else:
+        rows.append([{"text": home_label, "callback_data": "nav:home"}])
+    return rows
+
+
+def _navigation_back_state(
+    screen: str | None,
+    *,
+    patient_id: int | None = None,
+    page: int | None = None,
+    query: str | None = None,
+) -> dict[str, Any]:
+    return {
+        "navigation_back_screen": screen,
+        "navigation_back_patient_id": patient_id,
+        "navigation_back_page": page,
+        "navigation_back_query": query,
+    }
+
+
+def _navigation_back_state_from_context(state: dict[str, Any]) -> dict[str, Any]:
+    return _navigation_back_state(
+        state.get("navigation_back_screen")
+        if isinstance(state.get("navigation_back_screen"), str)
+        else None,
+        patient_id=state.get("navigation_back_patient_id")
+        if isinstance(state.get("navigation_back_patient_id"), int)
+        else None,
+        page=state.get("navigation_back_page")
+        if isinstance(state.get("navigation_back_page"), int)
+        else None,
+        query=state.get("navigation_back_query")
+        if isinstance(state.get("navigation_back_query"), str)
+        else None,
+    )
+
+
+def _navigation_current_state(state: dict[str, Any]) -> dict[str, Any]:
+    return _navigation_back_state(
+        state.get("navigation_screen")
+        if isinstance(state.get("navigation_screen"), str)
+        else None,
+        patient_id=state.get("navigation_patient_id")
+        if isinstance(state.get("navigation_patient_id"), int)
+        else None,
+        page=state.get("navigation_page")
+        if isinstance(state.get("navigation_page"), int)
+        else None,
+        query=state.get("navigation_query")
+        if isinstance(state.get("navigation_query"), str)
+        else None,
+    )
+
+
+async def _send_navigation_message(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    screen: str,
+    text: str,
+    reply_markup: dict[str, Any] | None = None,
+    state_patch: Optional[dict[str, Any]] = None,
+    back_state: Optional[dict[str, Any]] = None,
+) -> None:
+    mid = await send_telegram_message(chat_id, text, reply_markup=reply_markup)
+    payload: dict[str, Any] = {
+        "navigation_screen": screen,
+        "navigation_message_id": mid,
+    }
+    payload.update(
+        back_state
+        if back_state is not None
+        else _navigation_back_state(None)
+    )
+    if state_patch:
+        payload.update(state_patch)
+    await _save_state(db, doctor.id, channel_user_key, payload)
+
+
+async def _send_home_screen(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    prefix: str | None = None,
+) -> None:
+    text = _welcome_extended_block(doctor)
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    await _send_navigation_message(
+        db,
+        doctor,
+        chat_id,
+        channel_user_key,
+        screen="home",
+        text=text,
+        reply_markup=_menu_markup(),
+        state_patch={
+            "navigation_patient_id": None,
+            "navigation_page": None,
+            "navigation_query": None,
+        },
+    )
+
+
+async def _send_help_screen(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    prefix: str | None = None,
+) -> None:
+    text = HELP_TEXT if not prefix else f"{prefix}\n\n{HELP_TEXT}"
+    await _send_navigation_message(
+        db,
+        doctor,
+        chat_id,
+        channel_user_key,
+        screen="help",
+        text=text,
+        reply_markup=_menu_markup(),
+        state_patch={
+            "navigation_patient_id": None,
+            "navigation_page": None,
+            "navigation_query": None,
+        },
+    )
+
+
+async def _send_stats_screen(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    prefix: str | None = None,
+) -> None:
+    stats = await doctor_patient_stats(db, doctor.id)
+    diet_total = await doctor_diet_count(db, doctor.id)
+    first = stats.get("first_patient")
+    last = stats.get("last_patient")
+    lines = [
+        f"Total pacientes: {stats['total']}",
+        f"Total dietas generadas: {diet_total}",
+    ]
+    if first:
+        lines.append(f"Primer paciente: {patient_identity_label(first)}")
+    if last:
+        lines.append(f"Último paciente: {patient_identity_label(last)}")
+    text = "\n".join(lines)
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    await _send_navigation_message(
+        db,
+        doctor,
+        chat_id,
+        channel_user_key,
+        screen="stats",
+        text=text,
+        reply_markup=_menu_markup(),
+        state_patch={
+            "navigation_patient_id": None,
+            "navigation_page": None,
+            "navigation_query": None,
+        },
+    )
+
+
+async def _send_stale_navigation_refresh(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    *,
+    prefix: str = "Esa pantalla ya fue reemplazada.",
+) -> None:
+    state = await _load_state(db, doctor.id, channel_user_key)
+    back_state = _navigation_back_state_from_context(state)
+    screen = state.get("navigation_screen")
+    if screen == "help":
+        await _send_help_screen(
+            db, doctor, chat_id, channel_user_key, prefix=prefix
+        )
+        return
+    if screen == "stats":
+        await _send_stats_screen(
+            db, doctor, chat_id, channel_user_key, prefix=prefix
+        )
+        return
+    if screen == "patients":
+        page = state.get("navigation_page")
+        query = state.get("navigation_query")
+        await _send_patients_page(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            page=page if isinstance(page, int) else 1,
+            query=query if isinstance(query, str) and query else None,
+            prefix=prefix,
+        )
+        return
+    if screen == "patient_picker":
+        picker_ids = state.get("navigation_picker_patient_ids")
+        header = state.get("navigation_picker_header")
+        if isinstance(picker_ids, list):
+            rows: list[Patient] = []
+            for raw_pid in picker_ids:
+                if not isinstance(raw_pid, int):
+                    continue
+                patient = await get_doctor_patient(db, doctor.id, raw_pid)
+                if patient:
+                    rows.append(patient)
+            if rows:
+                await _send_ambiguous_patient_buttons(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    rows,
+                    header=header
+                    if isinstance(header, str) and header.strip()
+                    else "Varios pacientes coinciden. Elige uno:",
+                    prefix=prefix,
+                    back_state=back_state,
+                )
+                return
+    if screen in {"patient_card", "patient_history"}:
+        patient_id = state.get("navigation_patient_id")
+        if isinstance(patient_id, int):
+            patient = await get_doctor_patient(db, doctor.id, patient_id)
+            if patient:
+                if screen == "patient_history":
+                    page = state.get("navigation_page")
+                    await _send_patient_history_ui(
+                        db,
+                        doctor,
+                        chat_id,
+                        patient_id,
+                        channel_user_key=channel_user_key,
+                        page=page if isinstance(page, int) else 1,
+                        prefix=prefix,
+                        back_state=back_state,
+                    )
+                    return
+                await _show_patient_card(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    patient,
+                    prefix=prefix,
+                    back_state=back_state,
+                )
+                return
+    await _send_home_screen(
+        db, doctor, chat_id, channel_user_key, prefix=prefix
+    )
+
+
+async def _send_navigation_back_target(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    state: dict[str, Any],
+    *,
+    prefix: str,
+) -> None:
+    back_screen = state.get("navigation_back_screen")
+    back_page = state.get("navigation_back_page")
+    back_query = state.get("navigation_back_query")
+    back_patient_id = state.get("navigation_back_patient_id")
+    if back_screen == "patients":
+        await _send_patients_page(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            page=back_page if isinstance(back_page, int) else 1,
+            query=back_query if isinstance(back_query, str) and back_query else None,
+            prefix=prefix,
+        )
+        return
+    if back_screen == "patient_card" and isinstance(back_patient_id, int):
+        patient = await get_doctor_patient(db, doctor.id, back_patient_id)
+        if patient:
+            parent_state = _navigation_back_state(
+                "patients",
+                page=state.get("navigation_page")
+                if isinstance(state.get("navigation_page"), int)
+                else 1,
+                query=state.get("navigation_query")
+                if isinstance(state.get("navigation_query"), str)
+                else None,
+            )
+            await _show_patient_card(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                patient,
+                prefix=prefix,
+                back_state=parent_state,
+            )
+            return
+    await _send_home_screen(
+        db, doctor, chat_id, channel_user_key, prefix=prefix
+    )
+
+
+_DIET_TG_MEAL_TEXT_MAX = 3500
+
+
+def _diet_edit_day_inline_keyboard(diet_id: int, num_days: int) -> dict:
+    # Máx. 14 días en botones (límite práctico de filas; planes más largos: elige por tramos o edita vía web).
+    n = min(max(1, num_days), 14)
+    day_buttons: list[dict] = [
+        {
+            "text": str(d),
+            "callback_data": f"diet:edday:{diet_id}:{d}",
+        }
+        for d in range(1, n + 1)
+    ]
+    row_size = 4
+    grid = [
+        day_buttons[i : i + row_size] for i in range(0, len(day_buttons), row_size)
+    ]
+    grid.append(
+        [
+            {
+                "text": "Volver al resumen",
+                "callback_data": f"diet:preview:resume:{diet_id}",
+            }
+        ]
+    )
+    return {"inline_keyboard": grid}
+
+
+def _diet_edit_slot_inline_keyboard(
+    diet_id: int, day_1: int, slot_keys: list[str]
+) -> dict:
+    rows: list[list[dict]] = []
+    row: list[dict] = []
+    for i, slot in enumerate(slot_keys):
+        short = (
+            "Des" if slot == "breakfast" else
+            "MM" if slot == "mid_morning_snack" else
+            "A" if slot == "lunch" else
+            "M" if slot == "snack" else
+            "Ce" if slot == "dinner" else
+            meal_slot_label_es(slot)[:10]
+        )
+        row.append(
+            {
+                "text": f"{i + 1}. {short}",
+                "callback_data": f"diet:edsl:{diet_id}:{day_1}:{i}",
+            }
+        )
+        if len(row) == 2:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append(
+        [
+            {
+                "text": "⬅ Dias",
+                "callback_data": f"diet:preview:editpick:{diet_id}",
+            },
+            {
+                "text": "Resumen",
+                "callback_data": f"diet:preview:resume:{diet_id}",
+            },
+        ]
+    )
+    return {"inline_keyboard": rows}
+
+
 async def _transition_new_diet_duration_to_strategy(
     db: AsyncSession,
     doctor: Doctor,
@@ -599,22 +1482,21 @@ async def _transition_new_diet_duration_to_strategy(
             reply_markup=_diet_duration_choice_markup(patient.id),
         )
         return
-    await _save_state(
+    await _send_wizard_inline_prompt(
         db,
-        doctor.id,
+        doctor,
+        chat_id,
         channel_user_key,
-        {
+        text=_diet_meals_prompt_message(),
+        reply_markup=_diet_meals_choice_markup(patient.id),
+        state_patch={
             "awaiting": "diet_meals_per_day",
             "strategy_flow": "new",
             "patient_id": patient.id,
             "instruction": instruction if isinstance(instruction, str) else None,
             "duration_days": ddays,
+            "wizard_back_step": "diet_duration",
         },
-    )
-    await send_telegram_message(
-        chat_id,
-        _diet_meals_prompt_message(),
-        reply_markup=_diet_meals_choice_markup(patient.id),
     )
 
 
@@ -637,23 +1519,22 @@ async def _transition_regen_duration_to_strategy(
             reply_markup=_diet_regen_duration_choice_markup(diet_id),
         )
         return
-    await _save_state(
+    await _send_wizard_inline_prompt(
         db,
-        doctor.id,
+        doctor,
+        chat_id,
         channel_user_key,
-        {
+        text=_diet_meals_prompt_message(),
+        reply_markup=_diet_meals_choice_markup(patient.id),
+        state_patch={
             "awaiting": "diet_meals_per_day",
             "strategy_flow": "regen",
             "patient_id": patient.id,
             "pending_diet_id": diet_id,
             "regen_instruction": regen_instruction,
             "duration_days": ddays,
+            "wizard_back_step": "diet_regenerate_duration",
         },
-    )
-    await send_telegram_message(
-        chat_id,
-        _diet_meals_prompt_message(),
-        reply_markup=_diet_meals_choice_markup(patient.id),
     )
 
 
@@ -696,6 +1577,7 @@ async def _persist_diet_confirm_and_show(
         "meals_per_day": wizard_state.get("meals_per_day", 4),
         "strategy_mode": sm,
         "strategy_flow": flow,
+        "wizard_back_step": _wizard_back_step_for_confirm(wizard_state),
     }
     if is_regen:
         pid = wizard_state.get("pending_diet_id")
@@ -724,16 +1606,19 @@ async def _persist_diet_confirm_and_show(
         if k in wizard_state and wizard_state[k] is not None:
             confirm_payload[k] = wizard_state[k]
     await _save_state(db, doctor.id, channel_user_key, confirm_payload)
-    await send_telegram_message(
+    await _send_diet_confirm_prompt(
+        db,
+        doctor,
         chat_id,
-        _diet_confirm_body(
+        channel_user_key,
+        patient,
+        body=_diet_confirm_body(
             patient,
             instruction_summary=instr_summary,
             duration_days=ddays,
             strategy_summary_lines=summary_strat,
             is_regenerate=is_regen,
         ),
-        reply_markup=_diet_confirm_markup(patient.id),
     )
 
 
@@ -741,6 +1626,23 @@ def _macro_btn_to_level(ch: str) -> Any:
     if ch == "s":
         return None
     return {"l": "low", "n": "normal", "h": "high"}.get(ch)
+
+
+def _wizard_inline_matches(state: dict[str, Any], message: dict[str, Any]) -> bool:
+    return _state_message_matches(
+        state,
+        key="wizard_inline_message_id",
+        message=message,
+    )
+
+
+def _wizard_back_step_for_confirm(state: dict[str, Any]) -> str:
+    sm = state.get("strategy_mode")
+    if sm == "guided":
+        return "diet_macro_fat"
+    if sm == "auto":
+        return "diet_strategy_mode"
+    return "diet_manual_fat_g"
 
 
 async def _handle_diet_meals_callback(
@@ -751,23 +1653,34 @@ async def _handle_diet_meals_callback(
     *,
     patient_id_cb: int,
     meals_per_day: int,
+    message: Optional[dict[str, Any]] = None,
 ) -> None:
-    state = await _load_state(db, doctor.id, channel_user_key)
-    if state.get("awaiting") != "diet_meals_per_day" or state.get("patient_id") != patient_id_cb:
-        await send_telegram_message(
+    state = await _load_state_for_update(db, doctor.id, channel_user_key)
+    if (
+        state.get("awaiting") != "diet_meals_per_day"
+        or state.get("patient_id") != patient_id_cb
+        or (message is not None and not _wizard_inline_matches(state, message))
+    ):
+        await _send_stale_step_refresh(
+            db,
+            doctor,
             chat_id,
-            "Este paso ya no aplica. Vuelve a iniciar el flujo de dieta.",
-            reply_markup=_menu_markup(),
+            channel_user_key,
+            prefix="Este paso ya no aplica.",
         )
         return
     st = dict(state)
     st["meals_per_day"] = meals_per_day
     st["awaiting"] = "diet_strategy_mode"
-    await _save_state(db, doctor.id, channel_user_key, st)
-    await send_telegram_message(
+    st["wizard_back_step"] = "diet_duration"
+    await _send_wizard_inline_prompt(
+        db,
+        doctor,
         chat_id,
-        _diet_strategy_mode_prompt_message(),
+        channel_user_key,
+        text=_diet_strategy_mode_prompt_message(),
         reply_markup=_diet_strategy_mode_markup(patient_id_cb),
+        state_patch=st,
     )
 
 
@@ -779,15 +1692,20 @@ async def _handle_diet_smd_callback(
     *,
     patient_id_cb: int,
     letter: str,
+    message: Optional[dict[str, Any]] = None,
 ) -> None:
-    state = await _load_state(db, doctor.id, channel_user_key)
-    if state.get("awaiting") != "diet_strategy_mode" or state.get(
-        "patient_id"
-    ) != patient_id_cb:
-        await send_telegram_message(
+    state = await _load_state_for_update(db, doctor.id, channel_user_key)
+    if (
+        state.get("awaiting") != "diet_strategy_mode"
+        or state.get("patient_id") != patient_id_cb
+        or (message is not None and not _wizard_inline_matches(state, message))
+    ):
+        await _send_stale_step_refresh(
+            db,
+            doctor,
             chat_id,
-            "Este paso ya no aplica. Vuelve a iniciar el flujo de dieta.",
-            reply_markup=_menu_markup(),
+            channel_user_key,
+            prefix="Este paso ya no aplica.",
         )
         return
     patient = await get_doctor_patient(db, doctor.id, patient_id_cb)
@@ -814,11 +1732,15 @@ async def _handle_diet_smd_callback(
         for k in ("macro_protein", "macro_carbs", "macro_fat"):
             st.pop(k, None)
         st["awaiting"] = "diet_strategy_style"
-        await _save_state(db, doctor.id, channel_user_key, st)
-        await send_telegram_message(
+        st["wizard_back_step"] = "diet_meals_per_day"
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
             chat_id,
-            _diet_strategy_style_prompt_message(),
+            channel_user_key,
+            text=_diet_strategy_style_prompt_message(),
             reply_markup=_diet_strategy_style_markup(patient_id_cb),
+            state_patch=st,
         )
     elif letter == "m":
         st["strategy_mode"] = "manual"
@@ -832,6 +1754,7 @@ async def _handle_diet_smd_callback(
         ):
             st.pop(k, None)
         st["awaiting"] = "diet_manual_kcal"
+        st["wizard_back_step"] = "diet_strategy_mode"
         await _save_state(db, doctor.id, channel_user_key, st)
         await send_telegram_message(
             chat_id,
@@ -850,15 +1773,20 @@ async def _handle_diet_sty_callback(
     *,
     code: str,
     patient_id_cb: int,
+    message: Optional[dict[str, Any]] = None,
 ) -> None:
-    state = await _load_state(db, doctor.id, channel_user_key)
-    if state.get("awaiting") != "diet_strategy_style" or state.get(
-        "patient_id"
-    ) != patient_id_cb:
-        await send_telegram_message(
+    state = await _load_state_for_update(db, doctor.id, channel_user_key)
+    if (
+        state.get("awaiting") != "diet_strategy_style"
+        or state.get("patient_id") != patient_id_cb
+        or (message is not None and not _wizard_inline_matches(state, message))
+    ):
+        await _send_stale_step_refresh(
+            db,
+            doctor,
             chat_id,
-            "Este paso ya no aplica.",
-            reply_markup=_menu_markup(),
+            channel_user_key,
+            prefix="Este paso ya no aplica.",
         )
         return
     if code not in STYLE_CODE_TO_API:
@@ -871,11 +1799,15 @@ async def _handle_diet_sty_callback(
     else:
         st.pop("diet_style", None)
     st["awaiting"] = "diet_macro_protein"
-    await _save_state(db, doctor.id, channel_user_key, st)
-    await send_telegram_message(
+    st["wizard_back_step"] = "diet_strategy_mode"
+    await _send_wizard_inline_prompt(
+        db,
+        doctor,
         chat_id,
-        _diet_macro_protein_prompt_message(),
+        channel_user_key,
+        text=_diet_macro_protein_prompt_message(),
         reply_markup=_diet_macro_protein_markup(),
+        state_patch=st,
     )
 
 
@@ -887,6 +1819,7 @@ async def _handle_diet_macro_callback(
     *,
     which: str,
     letter: str,
+    message: Optional[dict[str, Any]] = None,
 ) -> None:
     awaiting_map = {
         "mp": "diet_macro_protein",
@@ -902,12 +1835,16 @@ async def _handle_diet_macro_callback(
         which
     ]
     need = awaiting_map[which]
-    state = await _load_state(db, doctor.id, channel_user_key)
-    if state.get("awaiting") != need:
-        await send_telegram_message(
+    state = await _load_state_for_update(db, doctor.id, channel_user_key)
+    if state.get("awaiting") != need or (
+        message is not None and not _wizard_inline_matches(state, message)
+    ):
+        await _send_stale_step_refresh(
+            db,
+            doctor,
             chat_id,
-            "Este paso ya no aplica.",
-            reply_markup=_menu_markup(),
+            channel_user_key,
+            prefix="Este paso ya no aplica.",
         )
         return
     lvl = _macro_btn_to_level(letter)
@@ -923,18 +1860,26 @@ async def _handle_diet_macro_callback(
         )
         return
     st["awaiting"] = nxt
-    await _save_state(db, doctor.id, channel_user_key, st)
+    st["wizard_back_step"] = "diet_macro_protein" if which == "mp" else "diet_macro_carbs"
     if which == "mp":
-        await send_telegram_message(
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
             chat_id,
-            _diet_macro_carbs_prompt_message(),
+            channel_user_key,
+            text=_diet_macro_carbs_prompt_message(),
             reply_markup=_diet_macro_carbs_markup(),
+            state_patch=st,
         )
     else:
-        await send_telegram_message(
+        await _send_wizard_inline_prompt(
+            db,
+            doctor,
             chat_id,
-            _diet_macro_fat_prompt_message(),
+            channel_user_key,
+            text=_diet_macro_fat_prompt_message(),
             reply_markup=_diet_macro_fat_markup(),
+            state_patch=st,
         )
 
 
@@ -1036,23 +1981,14 @@ async def _complete_diet_regenerate_with_duration(
         msg = "\n".join(e.reasons) if e.reasons else e.message
         await send_telegram_message(chat_id, msg[:4090])
         return
-    preview = _format_diet_preview_message(
-        diet, patient, doctor_note=diet.notes
-    )
-    await send_telegram_message(
-        chat_id,
-        preview,
-        reply_markup=_diet_preview_markup(diet.id),
-    )
-    await _save_state(
+    await _send_diet_preview_and_store_state(
         db,
-        doctor.id,
+        doctor,
+        chat_id,
         channel_user_key,
-        {
-            "awaiting": "diet_preview",
-            "pending_diet_id": diet.id,
-            "patient_id": patient.id,
-        },
+        diet,
+        patient,
+        doctor_note=diet.notes,
     )
 
 
@@ -1149,11 +2085,7 @@ async def _maybe_send_first_welcome(
     state = await _load_state(db, doctor.id, channel_user_key)
     if state.get("welcome_shown"):
         return
-    await send_telegram_message(
-        chat_id,
-        _welcome_extended_block(doctor),
-        reply_markup=_menu_markup(),
-    )
+    await _send_home_screen(db, doctor, chat_id, channel_user_key)
     await _save_state(
         db, doctor.id, channel_user_key, {"welcome_shown": True}
     )
@@ -1164,8 +2096,11 @@ async def _send_patient_history_ui(
     doctor: Doctor,
     chat_id: str,
     patient_id: int,
+    channel_user_key: str,
     *,
     page: int = 1,
+    prefix: str | None = None,
+    back_state: Optional[dict[str, Any]] = None,
 ) -> None:
     diets, total = await list_patient_diets(
         db, doctor.id, patient_id, page=page, page_size=5
@@ -1187,12 +2122,25 @@ async def _send_patient_history_ui(
         )
     lines.append(f"Página {page} · Total: {total}")
     pagination = _history_pagination_markup(patient_id, page, total, 5)
-    await send_telegram_message(
+    text = "\n".join(lines)
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    await _send_navigation_message(
+        db,
+        doctor,
         chat_id,
-        "\n".join(lines),
-        reply_markup={
-            "inline_keyboard": actions + pagination["inline_keyboard"],
+        channel_user_key,
+        screen="patient_history",
+        text=text,
+        reply_markup={"inline_keyboard": actions + pagination["inline_keyboard"]},
+        state_patch={
+            "navigation_patient_id": patient_id,
+            "navigation_page": page,
+            "navigation_query": None,
         },
+        back_state=back_state
+        if back_state is not None
+        else _navigation_back_state("patient_card", patient_id=patient_id),
     )
 
 
@@ -1232,10 +2180,16 @@ async def _queue_metric_confirmation(
             channel_user_key,
             payload_w,
         )
-        await send_telegram_message(
+        mid = await send_telegram_message(
             chat_id,
             f"¿Confirmar peso {weight_kg:.2f} kg para {patient.first_name} {patient.last_name}?",
             reply_markup=_metric_confirm_markup(patient.id, "weight"),
+        )
+        await _save_state(
+            db,
+            doctor.id,
+            channel_user_key,
+            {"metric_confirm_message_id": mid},
         )
         return
     if height_cm is not None:
@@ -1260,10 +2214,16 @@ async def _queue_metric_confirmation(
             channel_user_key,
             payload_h,
         )
-        await send_telegram_message(
+        mid = await send_telegram_message(
             chat_id,
             f"¿Confirmar estatura {height_cm:.1f} cm para {patient.first_name} {patient.last_name}?",
             reply_markup=_metric_confirm_markup(patient.id, "height"),
+        )
+        await _save_state(
+            db,
+            doctor.id,
+            channel_user_key,
+            {"metric_confirm_message_id": mid},
         )
         return
 
@@ -1275,6 +2235,7 @@ def _patient_actions_markup(patient_id: int) -> dict:
                 {"text": "Generar dieta", "callback_data": f"patient:diet:{patient_id}"},
                 {"text": "Historial dietas", "callback_data": f"patient:history:{patient_id}:1"},
             ],
+            *_navigation_footer_markup(include_back=True),
         ]
     }
 
@@ -1297,7 +2258,9 @@ def _history_pagination_markup(patient_id: int, page: int, total: int, page_size
                 "callback_data": f"patient:history:{patient_id}:{page + 1}",
             }
         )
-    return {"inline_keyboard": [row] if row else []}
+    keyboard = [row] if row else []
+    keyboard.extend(_navigation_footer_markup(include_back=True))
+    return {"inline_keyboard": keyboard}
 
 
 async def _execute_diet_generation(
@@ -1350,23 +2313,14 @@ async def _execute_diet_generation(
         msg = "\n".join(e.reasons) if e.reasons else e.message
         await send_telegram_message(chat_id, msg[:4090])
         return
-    preview = _format_diet_preview_message(
-        diet, patient, doctor_note=instruction
-    )
-    await send_telegram_message(
-        chat_id,
-        preview,
-        reply_markup=_diet_preview_markup(diet.id),
-    )
-    await _save_state(
+    await _send_diet_preview_and_store_state(
         db,
-        doctor.id,
+        doctor,
+        chat_id,
         channel_user_key,
-        {
-            "awaiting": "diet_preview",
-            "pending_diet_id": diet.id,
-            "patient_id": patient.id,
-        },
+        diet,
+        patient,
+        doctor_note=instruction,
     )
 
 
@@ -1388,12 +2342,21 @@ async def _start_guided_diet_flow(
         db,
         doctor.id,
         channel_user_key,
-        {"awaiting": "diet_note_offer", "patient_id": patient.id},
+        {
+            "awaiting": "diet_note_offer",
+            "patient_id": patient.id,
+            "navigation_message_id": None,
+        },
     )
-    await send_telegram_message(
+    await _send_wizard_inline_prompt(
+        db,
+        doctor,
         chat_id,
-        "¿Quieres agregar una nota o especificaciones extra para orientar la generación "
-        "de la dieta? Es opcional.",
+        channel_user_key,
+        text=(
+            "¿Quieres agregar una nota o especificaciones extra para orientar la generación "
+            "de la dieta? Es opcional."
+        ),
         reply_markup=_diet_note_offer_markup(patient.id),
     )
 
@@ -1404,22 +2367,45 @@ async def _show_patient_card(
     chat_id: str,
     channel_user_key: str,
     patient: Patient,
+    *,
+    prefix: str | None = None,
+    back_state: Optional[dict[str, Any]] = None,
 ) -> None:
     await _remember_patient_context(db, doctor.id, channel_user_key, patient.id)
     profile = await get_patient_profile(db, patient.id)
     metric = await latest_metric(db, patient.id)
-    await send_telegram_message(
+    text = format_patient_summary(patient, profile=profile, metric=metric)
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    await _send_navigation_message(
+        db,
+        doctor,
         chat_id,
-        format_patient_summary(patient, profile=profile, metric=metric),
+        channel_user_key,
+        screen="patient_card",
+        text=text,
         reply_markup=_patient_actions_markup(patient.id),
+        state_patch={
+            "navigation_patient_id": patient.id,
+            "navigation_page": None,
+            "navigation_query": None,
+        },
+        back_state=back_state
+        if back_state is not None
+        else _navigation_back_state("patients", page=1),
     )
 
 
 async def _send_ambiguous_patient_buttons(
+    db: AsyncSession,
+    doctor: Doctor,
     chat_id: str,
+    channel_user_key: str,
     rows: list[Patient],
     *,
     header: str = "Varios pacientes coinciden. Elige uno:",
+    prefix: str | None = None,
+    back_state: Optional[dict[str, Any]] = None,
 ) -> None:
     lines = [header]
     patient_rows: list[list[dict]] = []
@@ -1433,11 +2419,33 @@ async def _send_ambiguous_patient_buttons(
                 }
             ]
         )
-    await send_telegram_message(chat_id, "\n".join(lines))
-    await send_telegram_message(
+    text = "\n".join(lines)
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    include_back = bool(
+        back_state
+        and isinstance(back_state.get("navigation_back_screen"), str)
+        and back_state.get("navigation_back_screen")
+    )
+    await _send_navigation_message(
+        db,
+        doctor,
         chat_id,
-        "Opciones:",
-        reply_markup={"inline_keyboard": patient_rows},
+        channel_user_key,
+        screen="patient_picker",
+        text=text,
+        reply_markup={
+            "inline_keyboard": patient_rows
+            + _navigation_footer_markup(include_back=include_back)
+        },
+        state_patch={
+            "navigation_patient_id": None,
+            "navigation_page": None,
+            "navigation_query": None,
+            "navigation_picker_patient_ids": [p.id for p in rows],
+            "navigation_picker_header": header,
+        },
+        back_state=back_state if back_state is not None else _navigation_back_state("home"),
     )
 
 
@@ -1463,7 +2471,11 @@ def _patients_pagination_markup(
             }
         )
     keyboard = [row] if row else []
-    keyboard.append([{"text": "Buscar", "callback_data": "menu:search"}])
+    search_row = [{"text": "Buscar", "callback_data": "menu:search"}]
+    if query:
+        search_row.append({"text": "Limpiar", "callback_data": "menu:patients:1"})
+    keyboard.append(search_row)
+    keyboard.extend(_navigation_footer_markup(include_back=False))
     return {"inline_keyboard": keyboard}
 
 
@@ -1471,9 +2483,11 @@ async def _send_patients_page(
     db: AsyncSession,
     doctor: Doctor,
     chat_id: str,
+    channel_user_key: str,
     *,
     page: int = 1,
     query: str | None = None,
+    prefix: str | None = None,
 ) -> None:
     items, total = await search_doctor_patients(
         db,
@@ -1498,12 +2512,214 @@ async def _send_patients_page(
             ]
         )
     footer_markup = _patients_pagination_markup(page, total, query)
-    await send_telegram_message(chat_id, "\n".join(lines))
+    text = "\n".join(lines)
+    if prefix:
+        text = f"{prefix}\n\n{text}"
+    await _send_navigation_message(
+        db,
+        doctor,
+        chat_id,
+        channel_user_key,
+        screen="patients",
+        text=text,
+        reply_markup={
+            "inline_keyboard": patient_rows + footer_markup["inline_keyboard"]
+        },
+        state_patch={
+            "navigation_patient_id": None,
+            "navigation_page": page,
+            "navigation_query": query,
+        },
+        back_state=_navigation_back_state("home"),
+    )
+
+
+def _apply_tg_meal_text_to_plan(
+    plan: dict[str, Any], day_0: int, slot: str, meal_text: str
+) -> None:
+    days = plan.get("days")
+    if not isinstance(days, list) or day_0 < 0 or day_0 >= len(days):
+        return
+    day = days[day_0]
+    if not isinstance(day, dict):
+        return
+    t = meal_text.strip()
+    meals = day.get("meals")
+    if not isinstance(meals, dict):
+        meals = {}
+    meals[slot] = t
+    day["meals"] = meals
+    day[slot] = t
+
+
+async def _send_telegram_diet_fulldays(
+    chat_id: str, plan: dict[str, Any], num_days: int
+) -> None:
     await send_telegram_message(
         chat_id,
-        "Opciones:",
-        reply_markup={"inline_keyboard": patient_rows + footer_markup["inline_keyboard"]},
+        f"Detalle de comidas por día (ciclo base) — {num_days} día(s).",
     )
+    for d0 in range(num_days):
+        block = format_telegram_full_day_block(plan, d0, num_days=num_days)
+        for chunk in split_telegram_text_chunks(block, 4000):
+            await send_telegram_message(chat_id, chunk)
+
+
+async def _handle_diet_tg_edit_meal_text(
+    db: AsyncSession,
+    doctor: Doctor,
+    chat_id: str,
+    channel_user_key: str,
+    text: str,
+    state: dict,
+    normalized: str,
+) -> bool:
+    diet_id = state.get("pending_diet_id")
+    day_1 = state.get("edit_meal_day")
+    slot_i = state.get("edit_meal_slot_index")
+    if (
+        not isinstance(diet_id, int)
+        or not isinstance(day_1, int)
+        or not isinstance(slot_i, int)
+    ):
+        await _send_stale_step_refresh(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            prefix="Este paso ya no aplica.",
+        )
+        return True
+    if normalized in {
+        "cancelar",
+        "cancel",
+        "salir",
+        "saltar",
+        "atrás",
+        "atras",
+        "volver",
+    }:
+        pat_id = state.get("patient_id")
+        mid = await send_telegram_message(
+            chat_id,
+            "Cambio descartado. Sigue con la vista previa.",
+            reply_markup=_diet_preview_markup(diet_id),
+        )
+        st: dict[str, Any] = {
+            "awaiting": "diet_preview",
+            "pending_diet_id": diet_id,
+            "preview_message_id": mid,
+            "edit_day_message_id": None,
+            "edit_slot_message_id": None,
+        }
+        if isinstance(pat_id, int):
+            st["patient_id"] = pat_id
+        await _save_state(db, doctor.id, channel_user_key, st)
+        return True
+    diet = await db.get(Diet, diet_id)
+    if diet is None or diet.doctor_id != doctor.id:
+        await send_telegram_message(chat_id, "Dieta no encontrada.")
+        return True
+    if diet.status != "pending_approval":
+        await _clear_state(db, doctor.id, channel_user_key)
+        await send_telegram_message(
+            chat_id,
+            "Este borrador ya no está pendiente de aprobación.",
+            reply_markup=_menu_markup(),
+        )
+        return True
+    day_0 = day_1 - 1
+    raw = diet.structured_plan_json
+    if not isinstance(raw, dict):
+        await send_telegram_message(
+            chat_id, "No hay estructura de plan para editar."
+        )
+        return True
+    plan = copy.deepcopy(raw)
+    slots = resolve_plan_meal_slots(plan)
+    if slot_i < 0 or slot_i >= len(slots):
+        await send_telegram_message(
+            chat_id, "Ese intervalo de comida ya no existe. Elige otra comida."
+        )
+        return True
+    if len(text) > _DIET_TG_MEAL_TEXT_MAX:
+        await send_telegram_message(
+            chat_id,
+            f"Texto demasiado largo (máx. {_DIET_TG_MEAL_TEXT_MAX} caracteres). Reenvía un texto más corto.",
+            reply_markup=_cancel_markup(),
+        )
+        return True
+    if not text.strip():
+        await send_telegram_message(
+            chat_id,
+            "Escribe el contenido de la comida o escribe «cancelar» para volver a la vista previa.",
+        )
+        return True
+    slot_key = slots[slot_i]
+    days_list = plan.get("days")
+    old_day = (
+        days_list[day_0]
+        if isinstance(days_list, list) and 0 <= day_0 < len(days_list)
+        else {}
+    )
+    old_meals = old_day.get("meals") if isinstance(old_day, dict) else {}
+    old_value = (
+        old_meals.get(slot_key)
+        if isinstance(old_meals, dict)
+        else old_day.get(slot_key) if isinstance(old_day, dict) else None
+    )
+    old_text = old_value.strip() if isinstance(old_value, str) else ""
+    new_text = text.strip()
+    _apply_tg_meal_text_to_plan(plan, day_0, slot_key, text)
+    new_plan = normalize_plan_meal_metadata(plan)
+    diet.structured_plan_json = new_plan
+    diet.updated_at = utcnow()
+    db.add(
+        AuditLog(
+            doctor_id=doctor.id,
+            action="diet_edit_meal_manual",
+            entity_type="diet",
+            entity_id=diet.id,
+            payload_json={
+                "patient_id": diet.patient_id,
+                "day": day_1,
+                "slot": slot_key,
+                "old_text_length": len(old_text),
+                "new_text_length": len(new_text),
+                "channel": "telegram",
+            },
+        )
+    )
+    await db.flush()
+    patient = await get_doctor_patient(db, doctor.id, diet.patient_id)
+    if not patient:
+        await _clear_state(db, doctor.id, channel_user_key)
+        await send_telegram_message(chat_id, "Paciente no encontrado.")
+        return True
+    await _save_state(
+        db,
+        doctor.id,
+        channel_user_key,
+        {
+            "awaiting": "diet_preview",
+            "pending_diet_id": diet.id,
+            "patient_id": patient.id,
+            "edit_day_message_id": None,
+            "edit_slot_message_id": None,
+        },
+    )
+    await send_telegram_message(chat_id, "Comida actualizada. Vista previa:")
+    preview = _format_diet_preview_message(diet, patient, doctor_note=diet.notes)
+    mid = await send_telegram_message(
+        chat_id, preview, reply_markup=_diet_preview_markup(diet.id)
+    )
+    await _save_state(
+        db,
+        doctor.id,
+        channel_user_key,
+        {"preview_message_id": mid},
+    )
+    return True
 
 
 async def _handle_stateful_text(
@@ -1518,6 +2734,11 @@ async def _handle_stateful_text(
     if not awaiting:
         return False
     normalized = text.strip().lower()
+
+    if awaiting == "diet_tg_edit_meal":
+        return await _handle_diet_tg_edit_meal_text(
+            db, doctor, chat_id, channel_user_key, text, state, normalized
+        )
 
     if awaiting == "diet_note_offer":
         patient_id = state.get("patient_id")
@@ -1549,6 +2770,7 @@ async def _handle_stateful_text(
                     "awaiting": "diet_duration",
                     "patient_id": patient.id,
                     "instruction": None,
+                    "wizard_back_step": "diet_note_offer",
                 },
             )
             await send_telegram_message(
@@ -1581,6 +2803,7 @@ async def _handle_stateful_text(
                     "awaiting": "diet_duration",
                     "patient_id": patient.id,
                     "instruction": instruction,
+                    "wizard_back_step": "diet_note_offer",
                 },
             )
             await send_telegram_message(
@@ -1823,7 +3046,14 @@ async def _handle_stateful_text(
             channel_user_key,
             {"awaiting": None, "last_search": text.strip()},
         )
-        await _send_patients_page(db, doctor, chat_id, page=1, query=text.strip())
+        await _send_patients_page(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            page=1,
+            query=text.strip(),
+        )
         return True
     if awaiting == "metric_confirm":
         await send_telegram_message(
@@ -1942,6 +3172,7 @@ async def _handle_stateful_text(
                 "awaiting": "diet_duration",
                 "patient_id": patient.id,
                 "instruction": instruction,
+                "wizard_back_step": "diet_instruction",
             },
         )
         await send_telegram_message(
@@ -1977,6 +3208,7 @@ async def _handle_stateful_text(
                 "pending_diet_id": diet_id,
                 "patient_id": patient.id,
                 "regen_instruction": regen_instruction,
+                "wizard_back_step": "diet_preview",
             },
         )
         await send_telegram_message(
@@ -2171,29 +3403,186 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
         return True
 
     channel_user_key = f"telegram:{user_id}"
+    if _should_strip_inline_after_callback(data):
+        await _try_strip_callback_inline_keyboard(chat_id, message)
     parts = data.split(":")
     if data == "noop":
         if cb_id:
             await answer_telegram_callback_query(cb_id)
         return True
-    if parts[:2] == ["menu", "help"]:
-        await send_telegram_message(
-            chat_id, HELP_TEXT, reply_markup=_menu_markup()
+    if _navigation_callback_requires_fresh_message(data):
+        nav_state = await _load_state_for_update(db, doctor.id, channel_user_key)
+        if not _state_message_matches(
+            nav_state, key="navigation_message_id", message=message
+        ):
+            await _send_stale_navigation_refresh(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                prefix="Esa pantalla ya fue reemplazada. Te muestro la vigente.",
+            )
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
+    if data == "nav:home":
+        await _send_home_screen(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            prefix="Menú principal:",
         )
+        if cb_id:
+            await answer_telegram_callback_query(cb_id)
+        return True
+    if data == "nav:back":
+        nav_state = await _load_state(db, doctor.id, channel_user_key)
+        await _send_navigation_back_target(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            nav_state,
+            prefix="Has vuelto a la pantalla anterior.",
+        )
+        if cb_id:
+            await answer_telegram_callback_query(cb_id)
+        return True
+    if len(parts) >= 3 and parts[:2] == ["flow", "pswitch"] and parts[2] == "no":
+        await _save_state(
+            db,
+            doctor.id,
+            channel_user_key,
+            {
+                "pending_switch_patient_id": None,
+                "pending_switch_action": None,
+                "pending_switch_extra": None,
+            },
+        )
+        await send_telegram_message(chat_id, "Cambio de paciente cancelado.")
+        if cb_id:
+            await answer_telegram_callback_query(cb_id)
+        return True
+    if (
+        len(parts) >= 6
+        and parts[:3] == ["flow", "pswitch", "yes"]
+        and parts[4].isdigit()
+    ):
+        action_sw = parts[3]
+        patient_id_sw = int(parts[4])
+        extra_sw = parts[5]
+        await _save_state(
+            db,
+            doctor.id,
+            channel_user_key,
+            {
+                "active_patient_id": patient_id_sw,
+                "pending_switch_patient_id": None,
+                "pending_switch_action": None,
+                "pending_switch_extra": None,
+            },
+        )
+        patient_sw = await get_doctor_patient(db, doctor.id, patient_id_sw)
+        if not patient_sw:
+            await send_telegram_message(chat_id, "Paciente no encontrado.")
+        elif action_sw == "select":
+            await _show_patient_card(
+                db, doctor, chat_id, channel_user_key, patient_sw
+            )
+        elif action_sw == "diet":
+            await _start_guided_diet_flow(
+                db, doctor, chat_id, channel_user_key, patient_sw
+            )
+        elif action_sw == "history":
+            page_sw = int(extra_sw) if extra_sw.isdigit() else 1
+            await _send_patient_history_ui(
+                db,
+                doctor,
+                chat_id,
+                patient_id_sw,
+                channel_user_key,
+                page=max(1, page_sw),
+            )
+        elif action_sw == "weight":
+            await _save_state(
+                db,
+                doctor.id,
+                channel_user_key,
+                {
+                    "awaiting": "weight_kg",
+                    "patient_id": patient_sw.id,
+                },
+            )
+            await _remember_patient_context(
+                db, doctor.id, channel_user_key, patient_sw.id
+            )
+            await send_telegram_message(
+                chat_id,
+                "Perfecto. Envíame el peso en kg, lb o solo el número.",
+                reply_markup=_cancel_markup(),
+            )
+        elif action_sw == "height":
+            await _save_state(
+                db,
+                doctor.id,
+                channel_user_key,
+                {
+                    "awaiting": "height_cm",
+                    "patient_id": patient_sw.id,
+                },
+            )
+            await _remember_patient_context(
+                db, doctor.id, channel_user_key, patient_sw.id
+            )
+            await send_telegram_message(
+                chat_id,
+                "Perfecto. Envíame la estatura de este paciente en cm, m o pies/pulgadas.",
+                reply_markup=_cancel_markup(),
+            )
+        elif action_sw == "note" and extra_sw in ("yes", "no"):
+            if extra_sw == "no":
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "awaiting": "diet_duration",
+                        "patient_id": patient_sw.id,
+                        "instruction": None,
+                        "wizard_back_step": "diet_note_offer",
+                    },
+                )
+                await send_telegram_message(
+                    chat_id,
+                    _diet_duration_prompt_message(),
+                    reply_markup=_diet_duration_choice_markup(patient_sw.id),
+                )
+            else:
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "awaiting": "diet_instruction",
+                        "patient_id": patient_sw.id,
+                    },
+                )
+                await send_telegram_message(
+                    chat_id,
+                    "Escribe la nota o especificaciones extra para la IA (ej.: más proteína, sin mariscos). "
+                    "Si cambias de idea, escribe «saltar».",
+                    reply_markup=_cancel_markup(),
+                )
+        else:
+            await send_telegram_message(chat_id, "Cambio de paciente confirmado.")
+        if cb_id:
+            await answer_telegram_callback_query(cb_id)
+        return True
+    if parts[:2] == ["menu", "help"]:
+        await _send_help_screen(db, doctor, chat_id, channel_user_key)
     elif parts[:2] == ["menu", "stats"]:
-        stats = await doctor_patient_stats(db, doctor.id)
-        diet_total = await doctor_diet_count(db, doctor.id)
-        first = stats.get("first_patient")
-        last = stats.get("last_patient")
-        lines = [
-            f"Total pacientes: {stats['total']}",
-            f"Total dietas generadas: {diet_total}",
-        ]
-        if first:
-            lines.append(f"Primer paciente: {patient_identity_label(first)}")
-        if last:
-            lines.append(f"Último paciente: {patient_identity_label(last)}")
-        await send_telegram_message(chat_id, "\n".join(lines))
+        await _send_stats_screen(db, doctor, chat_id, channel_user_key)
     elif parts[:2] == ["menu", "search"]:
         await _save_state(
             db,
@@ -2211,49 +3600,356 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
         query = None
         if len(parts) >= 4 and parts[3] != "_":
             query = parts[3]
-        await _send_patients_page(db, doctor, chat_id, page=max(1, page), query=query)
+        await _send_patients_page(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            page=max(1, page),
+            query=query,
+        )
     elif len(parts) >= 3 and parts[:2] == ["patient", "weight"] and parts[2].isdigit():
-        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
+        patient_id_w = int(parts[2])
+        if not await _guard_active_patient_switch(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            target_patient_id=patient_id_w,
+            action="weight",
+            extra="_",
+        ):
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
+        patient_w = await get_doctor_patient(db, doctor.id, patient_id_w)
+        if not patient_w:
+            await send_telegram_message(chat_id, "Paciente no encontrado.")
+        else:
+            await _remember_patient_context(
+                db, doctor.id, channel_user_key, patient_id_w
+            )
+            await _save_state(
+                db,
+                doctor.id,
+                channel_user_key,
+                {"awaiting": "weight_kg", "patient_id": patient_w.id},
+            )
+            await send_telegram_message(
+                chat_id,
+                "Perfecto. Envíame el peso en kg, lb o solo el número.",
+                reply_markup=_cancel_markup(),
+            )
     elif len(parts) >= 3 and parts[:2] == ["patient", "height"] and parts[2].isdigit():
-        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
+        patient_id_h = int(parts[2])
+        if not await _guard_active_patient_switch(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            target_patient_id=patient_id_h,
+            action="height",
+            extra="_",
+        ):
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
+        patient_h = await get_doctor_patient(db, doctor.id, patient_id_h)
+        if not patient_h:
+            await send_telegram_message(chat_id, "Paciente no encontrado.")
+        else:
+            await _remember_patient_context(
+                db, doctor.id, channel_user_key, patient_id_h
+            )
+            await _save_state(
+                db,
+                doctor.id,
+                channel_user_key,
+                {"awaiting": "height_cm", "patient_id": patient_h.id},
+            )
+            await send_telegram_message(
+                chat_id,
+                "Perfecto. Envíame la estatura de este paciente en cm, m o pies/pulgadas.",
+                reply_markup=_cancel_markup(),
+            )
     elif len(parts) >= 3 and parts[:2] == ["patient", "city"] and parts[2].isdigit():
         await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 4 and parts[:2] == ["patient", "history"] and parts[2].isdigit():
         patient_id = int(parts[2])
         page = int(parts[3]) if parts[3].isdigit() else 1
+        if not await _guard_active_patient_switch(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            target_patient_id=patient_id,
+            action="history",
+            extra=str(max(1, page)),
+        ):
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
         await _send_patient_history_ui(
-            db, doctor, chat_id, patient_id, page=max(1, page)
+            db,
+            doctor,
+            chat_id,
+            patient_id,
+            channel_user_key,
+            page=max(1, page),
+            back_state=_navigation_back_state("patient_card", patient_id=patient_id),
         )
     elif (
         len(parts) >= 4
         and parts[0] == "metric"
         and parts[1] == "confirm"
         and parts[2].isdigit()
+        and parts[3] in ("weight", "height")
     ):
-        await _clear_state(db, doctor.id, channel_user_key)
-        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
-    elif len(parts) >= 3 and parts[0] == "metric" and parts[1] == "cancel":
-        await _clear_state(db, doctor.id, channel_user_key)
-        await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
+        patient_id_mc = int(parts[2])
+        kind_mc = parts[3]
+        st_m = await _load_state_for_update(db, doctor.id, channel_user_key)
+        if st_m.get("awaiting") != "metric_confirm" or st_m.get(
+            "patient_id"
+        ) != patient_id_mc or not _state_message_matches(
+            st_m, key="metric_confirm_message_id", message=message
+        ):
+            await _send_stale_step_refresh(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                prefix="Este paso ya no aplica.",
+            )
+        else:
+            pw = st_m.get("pending_weight_kg")
+            ph = st_m.get("pending_height_cm")
+            if kind_mc == "weight" and pw is None:
+                await send_telegram_message(
+                    chat_id,
+                    "No hay un peso pendiente de confirmar. Vuelve a enviarlo.",
+                )
+            elif kind_mc == "height" and ph is None:
+                await send_telegram_message(
+                    chat_id,
+                    "No hay una estatura pendiente de confirmar. Vuelve a enviarla.",
+                )
+            else:
+                patient_m = await get_doctor_patient(
+                    db, doctor.id, patient_id_mc
+                )
+                if not patient_m:
+                    await send_telegram_message(
+                        chat_id, "Paciente no encontrado."
+                    )
+                else:
+                    await _save_state(
+                        db,
+                        doctor.id,
+                        channel_user_key,
+                        {"metric_confirm_message_id": None},
+                    )
+                    if kind_mc == "weight":
+                        await add_patient_metric(
+                            db, patient_id_mc, weight_kg=float(pw)
+                        )
+                    else:
+                        await add_patient_metric(
+                            db, patient_id_mc, height_cm=float(ph)
+                        )
+                    resume = st_m.get("resume_after")
+                    if resume == "diet_confirm":
+                        new_st: dict[str, Any] = {
+                            k: v
+                            for k, v in st_m.items()
+                            if k
+                            not in (
+                                "pending_weight_kg",
+                                "pending_height_cm",
+                                "awaiting",
+                            )
+                        }
+                        new_st["awaiting"] = "diet_confirm"
+                        await _save_state(
+                            db, doctor.id, channel_user_key, new_st
+                        )
+                        if kind_mc == "height":
+                            await _send_diet_confirm_prompt(
+                                db,
+                                doctor,
+                                chat_id,
+                                channel_user_key,
+                                patient_m,
+                                body=(
+                                    "Estatura guardada. Ya puedo retomar la dieta: "
+                                    "pulsa «Confirmar generación» o ajusta la configuración."
+                                ),
+                            )
+                        else:
+                            await _send_diet_confirm_prompt(
+                                db,
+                                doctor,
+                                chat_id,
+                                channel_user_key,
+                                patient_m,
+                                body=(
+                                    "Peso guardado. Continúa con la generación: "
+                                    "pulsa «Confirmar generación» o ajusta la configuración."
+                                ),
+                            )
+                    else:
+                        await _clear_state(
+                            db, doctor.id, channel_user_key
+                        )
+                        if kind_mc == "weight":
+                            await send_telegram_message(
+                                chat_id,
+                                f"Peso guardado: {float(pw):.2f} kg.",
+                                reply_markup=_menu_markup(),
+                            )
+                        else:
+                            await send_telegram_message(
+                                chat_id,
+                                f"Estatura guardada: {float(ph):.1f} cm.",
+                                reply_markup=_menu_markup(),
+                            )
+                        await send_telegram_message(
+                            chat_id,
+                            _welcome_extended_block(doctor),
+                            reply_markup=_menu_markup(),
+                        )
+    elif (
+        len(parts) >= 3
+        and parts[0] == "metric"
+        and parts[1] == "cancel"
+        and parts[2].isdigit()
+    ):
+        patient_id_mx = int(parts[2])
+        st_x = await _load_state_for_update(db, doctor.id, channel_user_key)
+        if st_x.get("awaiting") != "metric_confirm" or st_x.get(
+            "patient_id"
+        ) != patient_id_mx or not _state_message_matches(
+            st_x, key="metric_confirm_message_id", message=message
+        ):
+            await _send_stale_step_refresh(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                prefix="Este paso ya no aplica.",
+            )
+        else:
+            resume_x = st_x.get("resume_after")
+            if resume_x == "diet_confirm":
+                new_x: dict[str, Any] = {
+                    k: v
+                    for k, v in st_x.items()
+                    if k
+                    not in (
+                        "pending_weight_kg",
+                        "pending_height_cm",
+                        "awaiting",
+                    )
+                }
+                new_x["awaiting"] = "diet_confirm"
+                await _save_state(
+                    db, doctor.id, channel_user_key, new_x
+                )
+                patient_mx = await get_doctor_patient(db, doctor.id, patient_id_mx)
+                if patient_mx:
+                    await _send_diet_confirm_prompt(
+                        db,
+                        doctor,
+                        chat_id,
+                        channel_user_key,
+                        patient_mx,
+                        body=(
+                            "Cambio de peso/estatura cancelado. Sigue con la "
+                            "generación con los botones de abajo."
+                        ),
+                    )
+                else:
+                    await send_telegram_message(
+                        chat_id,
+                        "Cambio de peso/estatura cancelado.",
+                        reply_markup=_menu_markup(),
+                    )
+            else:
+                await _clear_state(db, doctor.id, channel_user_key)
+                await send_telegram_message(
+                    chat_id,
+                    "Cambio cancelado.",
+                    reply_markup=_menu_markup(),
+                )
     elif len(parts) >= 3 and parts[:2] == ["patient", "diet"] and parts[2].isdigit():
         patient_id = int(parts[2])
+        if not await _guard_active_patient_switch(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            target_patient_id=patient_id,
+            action="diet",
+            extra="_",
+        ):
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
         patient = await get_doctor_patient(db, doctor.id, patient_id)
         if patient:
-            await _start_guided_diet_flow(
-                db, doctor, chat_id, channel_user_key, patient
-            )
+            st_diet = await _load_state(db, doctor.id, channel_user_key)
+            if _has_active_diet_wizard_for_patient(st_diet, patient_id):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Ya tienes un flujo de dieta abierto para este paciente.",
+                )
+            else:
+                await _start_guided_diet_flow(
+                    db, doctor, chat_id, channel_user_key, patient
+                )
     elif len(parts) >= 4 and parts[:2] == ["patient", "archive"] and parts[2].isdigit():
         await send_telegram_message(chat_id, MSG_PANEL_ONLY_UPDATES, reply_markup=_menu_markup())
     elif len(parts) >= 3 and parts[:2] == ["patient", "select"] and parts[2].isdigit():
         patient_id = int(parts[2])
+        if not await _guard_active_patient_switch(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            target_patient_id=patient_id,
+            action="select",
+            extra="_",
+        ):
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
         patient = await get_doctor_patient(db, doctor.id, patient_id)
         if patient:
+            current_nav = await _load_state(db, doctor.id, channel_user_key)
+            current_screen = current_nav.get("navigation_screen")
+            if current_screen == "patients":
+                back_state = _navigation_back_state(
+                    "patients",
+                    page=current_nav.get("navigation_page")
+                    if isinstance(current_nav.get("navigation_page"), int)
+                    else 1,
+                    query=current_nav.get("navigation_query")
+                    if isinstance(current_nav.get("navigation_query"), str)
+                    else None,
+                )
+            elif current_screen == "patient_picker":
+                back_state = _navigation_back_state_from_context(current_nav)
+            else:
+                back_state = _navigation_back_state("home")
             await _show_patient_card(
                 db,
                 doctor,
                 chat_id,
                 channel_user_key,
                 patient,
+                back_state=back_state,
             )
     elif len(parts) >= 3 and parts[:2] == ["diet", "pdf"] and parts[2].isdigit():
         diet = await db.get(Diet, int(parts[2]))
@@ -2269,24 +3965,51 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
         and parts[3].isdigit()
     ):
         patient_id = int(parts[3])
+        note_state = await _load_state_for_update(db, doctor.id, channel_user_key)
+        if (
+            note_state.get("awaiting") != "diet_note_offer"
+            or note_state.get("patient_id") != patient_id
+            or not _wizard_inline_matches(note_state, message)
+        ):
+            await _send_stale_step_refresh(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                prefix="Este paso ya no aplica.",
+            )
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
+        if not await _guard_active_patient_switch(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            target_patient_id=patient_id,
+            action="note",
+            extra=parts[2],
+        ):
+            if cb_id:
+                await answer_telegram_callback_query(cb_id)
+            return True
         patient = await get_doctor_patient(db, doctor.id, patient_id)
         if not patient:
             await send_telegram_message(chat_id, "Paciente no encontrado.")
         elif parts[2] == "no":
-            await _save_state(
+            await _send_wizard_inline_prompt(
                 db,
-                doctor.id,
+                doctor,
+                chat_id,
                 channel_user_key,
-                {
+                text=_diet_duration_prompt_message(),
+                reply_markup=_diet_duration_choice_markup(patient.id),
+                state_patch={
                     "awaiting": "diet_duration",
                     "patient_id": patient.id,
                     "instruction": None,
+                    "wizard_back_step": "diet_note_offer",
                 },
-            )
-            await send_telegram_message(
-                chat_id,
-                _diet_duration_prompt_message(),
-                reply_markup=_diet_duration_choice_markup(patient.id),
             )
         else:
             await _save_state(
@@ -2313,14 +4036,18 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
     ):
         patient_id_cb = int(parts[2])
         ddays_cb = int(parts[3])
-        state_cb = await _load_state(db, doctor.id, channel_user_key)
-        if state_cb.get("awaiting") != "diet_duration" or state_cb.get(
-            "patient_id"
-        ) != patient_id_cb:
-            await send_telegram_message(
+        state_cb = await _load_state_for_update(db, doctor.id, channel_user_key)
+        if (
+            state_cb.get("awaiting") != "diet_duration"
+            or state_cb.get("patient_id") != patient_id_cb
+            or not _wizard_inline_matches(state_cb, message)
+        ):
+            await _send_stale_step_refresh(
+                db,
+                doctor,
                 chat_id,
-                "Este paso ya no aplica. Vuelve a iniciar el flujo de dieta.",
-                reply_markup=_menu_markup(),
+                channel_user_key,
+                prefix="Este paso ya no aplica.",
             )
         else:
             patient_cb = await get_doctor_patient(db, doctor.id, patient_id_cb)
@@ -2346,14 +4073,18 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
     ):
         diet_id_cb = int(parts[2])
         ddays_cb = int(parts[3])
-        state_cb = await _load_state(db, doctor.id, channel_user_key)
-        if state_cb.get("awaiting") != "diet_regenerate_duration" or state_cb.get(
-            "pending_diet_id"
-        ) != diet_id_cb:
-            await send_telegram_message(
+        state_cb = await _load_state_for_update(db, doctor.id, channel_user_key)
+        if (
+            state_cb.get("awaiting") != "diet_regenerate_duration"
+            or state_cb.get("pending_diet_id") != diet_id_cb
+            or not _wizard_inline_matches(state_cb, message)
+        ):
+            await _send_stale_step_refresh(
+                db,
+                doctor,
                 chat_id,
-                "Este paso ya no aplica. Abre de nuevo «Regenerar con nueva nota».",
-                reply_markup=_menu_markup(),
+                channel_user_key,
+                prefix="Este paso ya no aplica.",
             )
         else:
             pid_cb = state_cb.get("patient_id")
@@ -2397,6 +4128,7 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
             channel_user_key,
             patient_id_cb=int(parts[3]),
             meals_per_day=int(parts[2]),
+            message=message,
         )
     elif (
         len(parts) == 4
@@ -2412,6 +4144,7 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
             channel_user_key,
             patient_id_cb=int(parts[3]),
             letter=parts[2],
+            message=message,
         )
     elif (
         len(parts) == 4
@@ -2427,6 +4160,7 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
             channel_user_key,
             code=parts[2],
             patient_id_cb=int(parts[3]),
+            message=message,
         )
     elif (
         len(parts) == 3
@@ -2441,7 +4175,284 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
             channel_user_key,
             which=parts[1],
             letter=parts[2],
+            message=message,
         )
+    elif (
+        len(parts) == 4
+        and parts[0] == "diet"
+        and parts[1] == "preview"
+        and parts[2] in ("fulldays", "editpick", "resume")
+        and parts[3].isdigit()
+    ):
+        diet_id = int(parts[3])
+        diet = await db.get(Diet, diet_id)
+        if diet is None or diet.doctor_id != doctor.id:
+            await send_telegram_message(chat_id, "Dieta no encontrada.")
+        elif diet.status != "pending_approval":
+            await send_telegram_message(
+                chat_id,
+                "Este borrador ya no está pendiente de aprobación.",
+                reply_markup=_menu_markup(),
+            )
+        else:
+            conv_state = await _load_state(db, doctor.id, channel_user_key)
+            if not _preview_session_matches(conv_state, diet_id):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Este paso ya no aplica.",
+                )
+            elif parts[2] == "resume":
+                patient = await get_doctor_patient(db, doctor.id, diet.patient_id)
+                if patient:
+                    await _send_diet_preview_and_store_state(
+                        db,
+                        doctor,
+                        chat_id,
+                        channel_user_key,
+                        diet,
+                        patient,
+                        doctor_note=diet.notes,
+                    )
+                else:
+                    await send_telegram_message(chat_id, "Paciente no encontrado.")
+            elif parts[2] == "fulldays":
+                raw_plan = diet.structured_plan_json
+                plan: dict[str, Any] = (
+                    raw_plan if isinstance(raw_plan, dict) else {}
+                )
+                days = plan.get("days")
+                num_days = len(days) if isinstance(days, list) and days else 1
+                if (
+                    not isinstance(days, list)
+                    or not days
+                    or not all(isinstance(d, dict) for d in days)
+                ):
+                    await send_telegram_message(
+                        chat_id,
+                        "Todavía no hay días estructurados en este plan.",
+                    )
+                else:
+                    await _send_telegram_diet_fulldays(
+                        chat_id, plan, num_days
+                    )
+                    await send_telegram_message(
+                        chat_id,
+                        "Puedes volver al resumen o editar una comida.",
+                        reply_markup={
+                            "inline_keyboard": [
+                                [
+                                    {
+                                        "text": "Resumen",
+                                        "callback_data": f"diet:preview:resume:{diet_id}",
+                                    },
+                                    {
+                                        "text": "Editar comida",
+                                        "callback_data": f"diet:preview:editpick:{diet_id}",
+                                    },
+                                ]
+                            ]
+                        },
+                    )
+            else:
+                raw_plan2 = diet.structured_plan_json
+                plan2: dict[str, Any] = (
+                    raw_plan2 if isinstance(raw_plan2, dict) else {}
+                )
+                dlist = plan2.get("days")
+                num_d = (
+                    len(dlist) if isinstance(dlist, list) and dlist else 1
+                )
+                if (
+                    not isinstance(dlist, list)
+                    or not dlist
+                    or not all(isinstance(d, dict) for d in dlist)
+                ):
+                    await send_telegram_message(
+                        chat_id,
+                        "Todavía no hay días estructurados en este plan.",
+                    )
+                else:
+                    n_btns = min(num_d, 14)
+                    cap_note = f" (primeros {n_btns} días)" if num_d > 14 else ""
+                    mid = await send_telegram_message(
+                        chat_id,
+                        f"Editar comida: elige el día (1–{n_btns}){cap_note}.",
+                        reply_markup=_diet_edit_day_inline_keyboard(
+                            diet_id, n_btns
+                        ),
+                    )
+                    await _save_state(
+                        db,
+                        doctor.id,
+                        channel_user_key,
+                        {
+                            "edit_day_message_id": mid,
+                            "edit_slot_message_id": None,
+                        },
+                    )
+    elif (
+        len(parts) == 5
+        and parts[0] == "diet"
+        and parts[1] == "edsl"
+        and parts[2].isdigit()
+        and parts[3].isdigit()
+        and parts[4].isdigit()
+    ):
+        diet_id = int(parts[2])
+        day_1 = int(parts[3])
+        slot_i = int(parts[4])
+        diet = await db.get(Diet, diet_id)
+        if diet is None or diet.doctor_id != doctor.id:
+            await send_telegram_message(chat_id, "Dieta no encontrada.")
+        elif diet.status != "pending_approval":
+            await send_telegram_message(
+                chat_id,
+                "Este borrador ya no está pendiente de aprobación.",
+                reply_markup=_menu_markup(),
+            )
+        else:
+            cstate = await _load_state(db, doctor.id, channel_user_key)
+            if not _preview_session_matches(cstate, diet_id):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Este paso ya no aplica.",
+                )
+            elif not _state_message_matches(
+                cstate, key="edit_slot_message_id", message=message
+            ):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Ese selector de comida ya fue reemplazado.",
+                )
+            else:
+                rawp = diet.structured_plan_json
+                if not isinstance(rawp, dict):
+                    await send_telegram_message(
+                        chat_id, "No hay estructura de plan para editar."
+                    )
+                else:
+                    dld = rawp.get("days")
+                    n_d = len(dld) if isinstance(dld, list) else 0
+                    if day_1 < 1 or day_1 > n_d or n_d < 1:
+                        await send_telegram_message(
+                            chat_id, "Ese número de día no existe en el plan."
+                        )
+                    else:
+                        slots = resolve_plan_meal_slots(rawp)
+                        if (
+                            slot_i < 0
+                            or slot_i >= len(slots)
+                        ):
+                            await send_telegram_message(
+                                chat_id, "Esa comida o día no es válido en este plan."
+                            )
+                        else:
+                            label = meal_slot_label_es(slots[slot_i])
+                            await _save_state(
+                                db,
+                                doctor.id,
+                                channel_user_key,
+                                {
+                                    "awaiting": "diet_tg_edit_meal",
+                                    "pending_diet_id": diet_id,
+                                    "patient_id": diet.patient_id,
+                                    "edit_meal_day": day_1,
+                                    "edit_meal_slot_index": slot_i,
+                                    "edit_day_message_id": None,
+                                    "edit_slot_message_id": None,
+                                },
+                            )
+                            await send_telegram_message(
+                                chat_id,
+                                f"Escribe el texto para {label} del día {day_1}. "
+                                f"Máximo {_DIET_TG_MEAL_TEXT_MAX} caracteres. "
+                                "«Cancelar» del teclado o la palabra «cancelar» vuelve a la vista previa.",
+                                reply_markup=_cancel_markup(),
+                            )
+    elif (
+        len(parts) == 4
+        and parts[0] == "diet"
+        and parts[1] == "edday"
+        and parts[2].isdigit()
+        and parts[3].isdigit()
+    ):
+        diet_id = int(parts[2])
+        day_1 = int(parts[3])
+        diet = await db.get(Diet, diet_id)
+        if diet is None or diet.doctor_id != doctor.id:
+            await send_telegram_message(chat_id, "Dieta no encontrada.")
+        elif diet.status != "pending_approval":
+            await send_telegram_message(
+                chat_id,
+                "Este borrador ya no está pendiente de aprobación.",
+                reply_markup=_menu_markup(),
+            )
+        else:
+            cstate2 = await _load_state(db, doctor.id, channel_user_key)
+            if not _preview_session_matches(cstate2, diet_id):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Este paso ya no aplica.",
+                )
+            elif not _state_message_matches(
+                cstate2, key="edit_day_message_id", message=message
+            ):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Ese selector de dia ya fue reemplazado.",
+                )
+            else:
+                rawp2 = diet.structured_plan_json
+                if not isinstance(rawp2, dict):
+                    await send_telegram_message(
+                        chat_id, "No hay estructura de plan para editar."
+                    )
+                else:
+                    dlist2 = rawp2.get("days")
+                    nlen = len(dlist2) if isinstance(dlist2, list) else 0
+                    if nlen < 1 or not isinstance(dlist2, list):
+                        await send_telegram_message(
+                            chat_id, "Todavía no hay días estructurados en este plan."
+                        )
+                    elif day_1 < 1 or day_1 > nlen:
+                        await send_telegram_message(
+                            chat_id, "Ese número de día no existe en el plan."
+                        )
+                    else:
+                        slots2 = resolve_plan_meal_slots(rawp2)
+                        if not slots2:
+                            await send_telegram_message(
+                                chat_id, "No hay comidas por día en este plan."
+                            )
+                        else:
+                            mid = await send_telegram_message(
+                                chat_id,
+                                f"Día {day_1} — elige qué comida reemplazar:",
+                                reply_markup=_diet_edit_slot_inline_keyboard(
+                                    diet_id, day_1, slots2
+                                ),
+                            )
+                            await _save_state(
+                                db,
+                                doctor.id,
+                                channel_user_key,
+                                {"edit_slot_message_id": mid},
+                            )
     elif (
         len(parts) >= 4
         and parts[0] == "diet"
@@ -2459,79 +4470,202 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
                 "Este borrador ya no está pendiente de aprobación.",
                 reply_markup=_menu_markup(),
             )
-        elif parts[2] == "quickmenu":
-            await send_telegram_message(
-                chat_id,
-                "Elige un ajuste rápido. Se regenerará el plan con ese cambio "
-                "(se conserva tu nota clínica previa cuando aplica).",
-                reply_markup=_diet_quick_adjust_markup(diet_id),
-            )
-        elif parts[2] == "reshow":
-            patient = await get_doctor_patient(db, doctor.id, diet.patient_id)
-            if patient:
-                preview = _format_diet_preview_message(
-                    diet, patient, doctor_note=diet.notes
-                )
-                await send_telegram_message(
-                    chat_id,
-                    preview,
-                    reply_markup=_diet_preview_markup(diet.id),
-                )
-            else:
-                await send_telegram_message(chat_id, "Paciente no encontrado.")
-        elif parts[2] == "approve":
-            try:
-                diet = await approve_diet_preview(db, doctor, diet_id)
-            except DietGenerationError:
-                await send_telegram_message(
-                    chat_id,
-                    "No pude aprobar el borrador.",
-                    reply_markup=_menu_markup(),
-                )
-            else:
-                patient = await get_doctor_patient(db, doctor.id, diet.patient_id)
-                await _clear_state(db, doctor.id, channel_user_key)
-                await send_telegram_message(
-                    chat_id,
-                    f"Dieta #{diet_id} aprobada. Envío el PDF.",
-                )
-                if patient:
-                    await _send_diet_pdf(
-                        db, doctor, chat_id, diet, patient=patient
-                    )
-        elif parts[2] == "discard":
-            try:
-                await discard_diet_preview(db, doctor, diet_id)
-            except DietGenerationError:
-                await send_telegram_message(
-                    chat_id,
-                    "No pude descartar el borrador.",
-                    reply_markup=_menu_markup(),
-                )
-            else:
-                await _clear_state(db, doctor.id, channel_user_key)
-                await send_telegram_message(
-                    chat_id,
-                    "Borrador descartado.",
-                    reply_markup=_menu_markup(),
-                )
         else:
-            await _save_state(
-                db,
-                doctor.id,
-                channel_user_key,
-                {
-                    "awaiting": "diet_regenerate_note",
-                    "pending_diet_id": diet_id,
-                    "patient_id": diet.patient_id,
-                },
+            conv_state = await _load_state(db, doctor.id, channel_user_key)
+            act = parts[2]
+            strict_preview = act in (
+                "approve",
+                "discard",
+                "regen",
+                "quickmenu",
             )
-            await send_telegram_message(
-                chat_id,
-                "Envía la nueva nota o especificaciones para regenerar el plan. "
-                "Escribe «saltar» para orientar solo con los datos del paciente.",
-                reply_markup=_cancel_markup(),
-            )
+            if strict_preview and not _preview_session_matches(
+                conv_state, diet_id
+            ):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Este paso ya no aplica.",
+                )
+            elif not _state_message_matches(
+                conv_state, key="preview_message_id", message=message
+            ):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Este mensaje ya fue reemplazado por otro más reciente.",
+                )
+            elif act == "quickmenu":
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {"preview_message_id": None},
+                )
+                await _send_diet_quick_adjust_menu(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    diet_id,
+                )
+            elif act == "reshow":
+                patient = await get_doctor_patient(db, doctor.id, diet.patient_id)
+                if patient:
+                    await _send_diet_preview_and_store_state(
+                        db,
+                        doctor,
+                        chat_id,
+                        channel_user_key,
+                        diet,
+                        patient,
+                        doctor_note=diet.notes,
+                    )
+                else:
+                    await send_telegram_message(chat_id, "Paciente no encontrado.")
+            elif act == "approve":
+                conv_state = await _load_state_for_update(
+                    db, doctor.id, channel_user_key
+                )
+                if (
+                    not _preview_session_matches(conv_state, diet_id)
+                    or not _state_message_matches(
+                        conv_state, key="preview_message_id", message=message
+                    )
+                ):
+                    await _send_stale_step_refresh(
+                        db,
+                        doctor,
+                        chat_id,
+                        channel_user_key,
+                        prefix="Este paso ya no aplica.",
+                    )
+                    if cb_id:
+                        await answer_telegram_callback_query(cb_id)
+                    return True
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "preview_message_id": None,
+                        "quick_adjust_message_id": None,
+                    },
+                )
+                try:
+                    diet = await approve_diet_preview(db, doctor, diet_id)
+                except DietGenerationError:
+                    await send_telegram_message(
+                        chat_id,
+                        "No pude aprobar el borrador.",
+                        reply_markup=_menu_markup(),
+                    )
+                else:
+                    patient = await get_doctor_patient(
+                        db, doctor.id, diet.patient_id
+                    )
+                    await _clear_state(db, doctor.id, channel_user_key)
+                    await send_telegram_message(
+                        chat_id,
+                        f"Dieta #{diet_id} aprobada. Envío el PDF.",
+                    )
+                    if patient:
+                        await _send_diet_pdf(
+                            db, doctor, chat_id, diet, patient=patient
+                        )
+            elif act == "discard":
+                conv_state = await _load_state_for_update(
+                    db, doctor.id, channel_user_key
+                )
+                if (
+                    not _preview_session_matches(conv_state, diet_id)
+                    or not _state_message_matches(
+                        conv_state, key="preview_message_id", message=message
+                    )
+                ):
+                    await _send_stale_step_refresh(
+                        db,
+                        doctor,
+                        chat_id,
+                        channel_user_key,
+                        prefix="Este paso ya no aplica.",
+                    )
+                    if cb_id:
+                        await answer_telegram_callback_query(cb_id)
+                    return True
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "preview_message_id": None,
+                        "quick_adjust_message_id": None,
+                    },
+                )
+                try:
+                    await discard_diet_preview(db, doctor, diet_id)
+                except DietGenerationError:
+                    await send_telegram_message(
+                        chat_id,
+                        "No pude descartar el borrador.",
+                        reply_markup=_menu_markup(),
+                    )
+                else:
+                    await _clear_state(db, doctor.id, channel_user_key)
+                    await send_telegram_message(
+                        chat_id,
+                        "Borrador descartado.",
+                        reply_markup=_menu_markup(),
+                    )
+            else:
+                conv_state = await _load_state_for_update(
+                    db, doctor.id, channel_user_key
+                )
+                if (
+                    not _preview_session_matches(conv_state, diet_id)
+                    or not _state_message_matches(
+                        conv_state, key="preview_message_id", message=message
+                    )
+                ):
+                    await _send_stale_step_refresh(
+                        db,
+                        doctor,
+                        chat_id,
+                        channel_user_key,
+                        prefix="Este paso ya no aplica.",
+                    )
+                    if cb_id:
+                        await answer_telegram_callback_query(cb_id)
+                    return True
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "preview_message_id": None,
+                        "quick_adjust_message_id": None,
+                    },
+                )
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "awaiting": "diet_regenerate_note",
+                        "pending_diet_id": diet_id,
+                        "patient_id": diet.patient_id,
+                    },
+                )
+                await send_telegram_message(
+                    chat_id,
+                    "Envía la nueva nota o especificaciones para regenerar el plan. "
+                    "Escribe «saltar» para orientar solo con los datos del paciente.",
+                    reply_markup=_cancel_markup(),
+                )
     elif (
         len(parts) >= 4
         and parts[0] == "diet"
@@ -2549,53 +4683,89 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
                 "Este borrador ya no está pendiente de aprobación.",
                 reply_markup=_menu_markup(),
             )
-        elif code not in _DIET_QUICK_ADJUST:
-            await send_telegram_message(chat_id, "Opción de ajuste no reconocida.")
         else:
-            merged = _merge_note_with_quick_adjust(diet.notes, code)
-            try:
-                diet = await regenerate_diet(
+            conv_quick = await _load_state_for_update(
+                db, doctor.id, channel_user_key
+            )
+            if not _preview_session_matches(conv_quick, diet_id):
+                await _send_stale_step_refresh(
                     db,
                     doctor,
-                    diet_id,
-                    merged,
-                    diet_status="pending_approval",
+                    chat_id,
+                    channel_user_key,
+                    prefix="Este paso ya no aplica.",
                 )
-            except DietGenerationError as e:
-                msg = "\n".join(e.reasons) if e.reasons else e.message
-                await send_telegram_message(chat_id, msg[:4090])
+            elif not _state_message_matches(
+                conv_quick, key="quick_adjust_message_id", message=message
+            ):
+                await _send_stale_step_refresh(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    prefix="Ese menú de ajustes ya fue reemplazado.",
+                )
+            elif code not in _DIET_QUICK_ADJUST:
+                await send_telegram_message(
+                    chat_id, "Opción de ajuste no reconocida."
+                )
             else:
-                patient = await get_doctor_patient(db, doctor.id, diet.patient_id)
-                if not patient:
-                    await send_telegram_message(chat_id, "Paciente no encontrado.")
-                else:
-                    preview = _format_diet_preview_message(
-                        diet, patient, doctor_note=diet.notes
-                    )
-                    await send_telegram_message(
-                        chat_id,
-                        preview,
-                        reply_markup=_diet_preview_markup(diet.id),
-                    )
-                    await _save_state(
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "preview_message_id": None,
+                        "quick_adjust_message_id": None,
+                    },
+                )
+                merged = _merge_note_with_quick_adjust(diet.notes, code)
+                try:
+                    diet = await regenerate_diet(
                         db,
-                        doctor.id,
-                        channel_user_key,
-                        {
-                            "awaiting": "diet_preview",
-                            "pending_diet_id": diet.id,
-                            "patient_id": patient.id,
-                        },
+                        doctor,
+                        diet_id,
+                        merged,
+                        diet_status="pending_approval",
                     )
+                except DietGenerationError as e:
+                    msg = "\n".join(e.reasons) if e.reasons else e.message
+                    await send_telegram_message(chat_id, msg[:4090])
+                else:
+                    patient = await get_doctor_patient(
+                        db, doctor.id, diet.patient_id
+                    )
+                    if not patient:
+                        await send_telegram_message(
+                            chat_id, "Paciente no encontrado."
+                        )
+                    else:
+                        await _send_diet_preview_and_store_state(
+                            db,
+                            doctor,
+                            chat_id,
+                            channel_user_key,
+                            diet,
+                            patient,
+                            doctor_note=diet.notes,
+                        )
     elif len(parts) >= 3 and parts[:2] == ["diet", "confirm"] and parts[2].isdigit():
         patient_id = int(parts[2])
         patient = await get_doctor_patient(db, doctor.id, patient_id)
-        state = await _load_state(db, doctor.id, channel_user_key)
-        if state.get("awaiting") != "diet_confirm" or state.get("patient_id") != patient_id:
-            await send_telegram_message(
+        state = await _load_state_for_update(db, doctor.id, channel_user_key)
+        if (
+            state.get("awaiting") != "diet_confirm"
+            or state.get("patient_id") != patient_id
+            or not _state_message_matches(
+                state, key="confirm_message_id", message=message
+            )
+        ):
+            await _send_stale_step_refresh(
+                db,
+                doctor,
                 chat_id,
-                "Este paso ya no aplica.",
-                reply_markup=_menu_markup(),
+                channel_user_key,
+                prefix="Este paso ya no aplica.",
             )
             if cb_id:
                 await answer_telegram_callback_query(cb_id)
@@ -2613,13 +4783,109 @@ async def _handle_callback_query(db: AsyncSession, update: dict) -> bool:
                 patient,
                 snap_cb,
             )
+    elif data == "flow:refresh":
+        await _send_stale_step_refresh(
+            db,
+            doctor,
+            chat_id,
+            channel_user_key,
+            prefix="Te muestro el paso vigente.",
+        )
+    elif data == "flow:back":
+        st_back = await _load_state(db, doctor.id, channel_user_key)
+        back_step = st_back.get("wizard_back_step")
+        awaiting_back = st_back.get("awaiting")
+        patient_id_back = st_back.get("patient_id")
+        if (
+            awaiting_back == "diet_note_offer"
+            and isinstance(patient_id_back, int)
+            and not isinstance(back_step, str)
+        ):
+            patient_back = await get_doctor_patient(
+                db, doctor.id, patient_id_back
+            )
+            if patient_back:
+                await _save_state(
+                    db,
+                    doctor.id,
+                    channel_user_key,
+                    {
+                        "awaiting": None,
+                        "wizard_inline_message_id": None,
+                        "confirm_message_id": None,
+                        "wizard_back_step": None,
+                    },
+                )
+                await _show_patient_card(
+                    db,
+                    doctor,
+                    chat_id,
+                    channel_user_key,
+                    patient_back,
+                    prefix="Has vuelto a la ficha del paciente.",
+                )
+                if cb_id:
+                    await answer_telegram_callback_query(cb_id)
+                return True
+        if not isinstance(back_step, str) or not back_step:
+            await _send_stale_step_refresh(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                prefix="No hay un paso anterior disponible. Te muestro el paso vigente.",
+            )
+        else:
+            await _save_state(
+                db,
+                doctor.id,
+                channel_user_key,
+                {
+                    "awaiting": back_step,
+                    "wizard_inline_message_id": None,
+                    "confirm_message_id": None,
+                },
+            )
+            await _send_stale_step_refresh(
+                db,
+                doctor,
+                chat_id,
+                channel_user_key,
+                prefix="Has vuelto al paso anterior.",
+            )
+    elif data == "flow:cancel":
+        stc = await _load_state(db, doctor.id, channel_user_key)
+        if stc.get("awaiting") == "diet_tg_edit_meal" and isinstance(
+            stc.get("pending_diet_id"), int
+        ):
+            did = stc.get("pending_diet_id")
+            pat = stc.get("patient_id")
+            upd: dict[str, Any] = {
+                "awaiting": "diet_preview",
+                "pending_diet_id": did,
+            }
+            if isinstance(pat, int):
+                upd["patient_id"] = pat
+            await _save_state(db, doctor.id, channel_user_key, upd)
+            await send_telegram_message(
+                chat_id,
+                "Edición cancelada. Sigue con la vista previa.",
+                reply_markup=_diet_preview_markup(did),
+            )
+        else:
+            await _clear_state(db, doctor.id, channel_user_key)
+            await send_telegram_message(
+                chat_id, "Flujo cancelado.", reply_markup=_menu_markup()
+            )
     elif (
         len(parts) >= 3
         and parts[:2] == ["diet", "cancel"]
         and parts[2].isdigit()
-    ) or data == "flow:cancel":
+    ):
         await _clear_state(db, doctor.id, channel_user_key)
-        await send_telegram_message(chat_id, "Flujo cancelado.", reply_markup=_menu_markup())
+        await send_telegram_message(
+            chat_id, "Flujo cancelado.", reply_markup=_menu_markup()
+        )
     if cb_id:
         await answer_telegram_callback_query(cb_id)
     return True
@@ -2659,25 +4925,28 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
                 )
                 if doctor_bound:
                     uid = str(from_user["id"])
+                    user_key = f"telegram:{uid}"
                     await _save_state(
                         db,
                         doctor_bound.id,
-                        f"telegram:{uid}",
+                        user_key,
                         {"welcome_shown": True},
                     )
-                    await send_telegram_message(
-                        chat_id,
-                        _welcome_extended_block(doctor_bound),
-                        reply_markup=_menu_markup(),
+                    await _send_home_screen(
+                        db, doctor_bound, chat_id, user_key
                     )
             return
         doctor_start = await _doctor_for_telegram_user(db, str(from_user["id"]))
         if doctor_start:
-            await send_telegram_message(
+            await _send_home_screen(
+                db,
+                doctor_start,
                 chat_id,
-                f"Hola, {_doctor_greeting_name(doctor_start)}. "
-                "Usa el menú o escribe lo que necesites.",
-                reply_markup=_menu_markup(),
+                f"telegram:{from_user['id']}",
+                prefix=(
+                    f"Hola, {_doctor_greeting_name(doctor_start)}. "
+                    "Usa el menú o escribe lo que necesites."
+                ),
             )
         else:
             await send_telegram_message(
@@ -2709,21 +4978,28 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
         if first_interaction and intent == "greeting":
             return
         if intent == "greeting":
-            await send_telegram_message(
+            await _send_home_screen(
+                db,
+                doctor,
                 chat_id,
-                f"Hola, {_doctor_greeting_name(doctor)}. ¿En qué puedo ayudarte?",
-                reply_markup=_menu_markup(),
+                user_key,
+                prefix=f"Hola, {_doctor_greeting_name(doctor)}. ¿En qué puedo ayudarte?",
             )
             return
         if intent == "thanks":
-            await send_telegram_message(
+            await _send_home_screen(
+                db,
+                doctor,
                 chat_id,
-                "Con gusto. Si quieres, puedo seguir con pacientes, estadísticas o una nueva dieta.",
-                reply_markup=_menu_markup(),
+                user_key,
+                prefix=(
+                    "Con gusto. Si quieres, puedo seguir con pacientes, "
+                    "estadísticas o una nueva dieta."
+                ),
             )
             return
         if intent == "patients":
-            await _send_patients_page(db, doctor, chat_id, page=1)
+            await _send_patients_page(db, doctor, chat_id, user_key, page=1)
             return
         if intent == "stats_patients":
             stats = await doctor_patient_stats(db, doctor.id)
@@ -2738,13 +5014,7 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
             )
             return
         if intent == "stats_summary":
-            stats = await doctor_patient_stats(db, doctor.id)
-            n = await doctor_diet_count(db, doctor.id)
-            lines = [
-                f"Pacientes: {stats['total']}",
-                f"Dietas: {n}",
-            ]
-            await send_telegram_message(chat_id, "\n".join(lines))
+            await _send_stats_screen(db, doctor, chat_id, user_key)
             return
         if intent == "search":
             await _save_state(
@@ -2760,17 +5030,15 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
             )
             return
         if intent == "help":
-            await send_telegram_message(
-                chat_id,
-                HELP_TEXT,
-                reply_markup=_menu_markup(),
-            )
+            await _send_help_screen(db, doctor, chat_id, user_key)
             return
         if intent == "menu":
-            await send_telegram_message(
+            await _send_home_screen(
+                db,
+                doctor,
                 chat_id,
-                "Menú principal:",
-                reply_markup=_menu_markup(),
+                user_key,
+                prefix="Menú principal:",
             )
             return
         if intent == "diet":
@@ -2792,11 +5060,18 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
                     "Entendí que quieres crear una dieta. Primero elige el paciente o dime su nombre.",
                     reply_markup=_menu_markup(),
                 )
-                await _send_patients_page(db, doctor, chat_id, page=1)
+                await _send_patients_page(db, doctor, chat_id, user_key, page=1)
                 return
             patient, err, amb = await _resolve_patient_for_doctor(db, doctor, hint)
             if amb is not None:
-                await _send_ambiguous_patient_buttons(chat_id, amb)
+                await _send_ambiguous_patient_buttons(
+                    db,
+                    doctor,
+                    chat_id,
+                    user_key,
+                    amb,
+                    back_state=_navigation_current_state(st0),
+                )
                 return
             if err or patient is None:
                 await send_telegram_message(
@@ -2804,7 +5079,7 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
                     "Entendí que quieres crear una dieta. Elige el paciente o escríbeme el nombre completo.",
                     reply_markup=_menu_markup(),
                 )
-                await _send_patients_page(db, doctor, chat_id, page=1)
+                await _send_patients_page(db, doctor, chat_id, user_key, page=1)
                 return
             await _start_guided_diet_flow(
                 db, doctor, chat_id, user_key, patient
@@ -2819,7 +5094,7 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
                         db, doctor.id, user_key, last_patient.id
                     )
                     await _send_patient_history_ui(
-                        db, doctor, chat_id, last_patient.id
+                        db, doctor, chat_id, last_patient.id, user_key
                     )
                     return
                 await send_telegram_message(
@@ -2829,12 +5104,21 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
                 return
             patient, err, amb = await _resolve_patient_for_doctor(db, doctor, hint)
             if amb is not None:
-                await _send_ambiguous_patient_buttons(chat_id, amb)
+                await _send_ambiguous_patient_buttons(
+                    db,
+                    doctor,
+                    chat_id,
+                    user_key,
+                    amb,
+                    back_state=_navigation_current_state(st0),
+                )
                 return
             if err or patient is None:
                 await send_telegram_message(chat_id, err or MSG_NO_DATA)
                 return
-            await _send_patient_history_ui(db, doctor, chat_id, patient.id)
+            await _send_patient_history_ui(
+                db, doctor, chat_id, patient.id, user_key
+            )
             return
         if intent in ("patient_show", "patient_edit"):
             hint = _patient_name_hint(text, entities)
@@ -2852,7 +5136,14 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
                 return
             patient, err, amb = await _resolve_patient_for_doctor(db, doctor, hint)
             if amb is not None:
-                await _send_ambiguous_patient_buttons(chat_id, amb)
+                await _send_ambiguous_patient_buttons(
+                    db,
+                    doctor,
+                    chat_id,
+                    user_key,
+                    amb,
+                    back_state=_navigation_current_state(st0),
+                )
                 return
             if err or patient is None:
                 await send_telegram_message(chat_id, err or MSG_NO_DATA)
@@ -2889,19 +5180,17 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
         return
 
     if cmd in ("/ayuda", "/help"):
-        await send_telegram_message(
-            chat_id,
-            HELP_TEXT,
-            reply_markup=_menu_markup(),
-        )
+        await _send_help_screen(db, doctor, chat_id, user_key)
     elif cmd == "/menu":
-        await send_telegram_message(
+        await _send_home_screen(
+            db,
+            doctor,
             chat_id,
-            "Menú principal:",
-            reply_markup=_menu_markup(),
+            user_key,
+            prefix="Menú principal:",
         )
     elif cmd == "/pacientes":
-        await _send_patients_page(db, doctor, chat_id, page=1)
+        await _send_patients_page(db, doctor, chat_id, user_key, page=1)
     elif cmd in ("/ficha", "/buscar"):
         if cmd == "/buscar" and not rest.strip():
             await _save_state(
@@ -2924,7 +5213,15 @@ async def handle_telegram_update(db: AsyncSession, update: dict) -> None:
         else:
             patient, err, amb = await _resolve_patient_for_doctor(db, doctor, rest)
             if amb is not None:
-                await _send_ambiguous_patient_buttons(chat_id, amb)
+                current_state = await _load_state(db, doctor.id, user_key)
+                await _send_ambiguous_patient_buttons(
+                    db,
+                    doctor,
+                    chat_id,
+                    user_key,
+                    amb,
+                    back_state=_navigation_current_state(current_state),
+                )
             elif err:
                 await send_telegram_message(chat_id, err[:4090])
             elif patient:

@@ -6,6 +6,16 @@ from app.logic.diet_duration import QUICK_PLAN_DURATION_DAYS
 from app.models import Patient
 
 
+def _with_wizard_nav(rows: list[list[dict]], *, include_back: bool = True) -> dict:
+    nav: list[dict] = []
+    if include_back:
+        nav.append({"text": "⬅ Volver", "callback_data": "flow:back"})
+    if nav:
+        rows.append(nav)
+    rows.append([{"text": "Cancelar", "callback_data": "flow:cancel"}])
+    return {"inline_keyboard": rows}
+
+
 def diet_duration_prompt_message() -> str:
     return (
         "¿Cuántos días en total debe seguir el paciente este plan?\n"
@@ -30,8 +40,7 @@ def diet_duration_choice_markup(patient_id: int) -> dict:
             row = []
     if row:
         rows.append(row)
-    rows.append([{"text": "Cancelar", "callback_data": "flow:cancel"}])
-    return {"inline_keyboard": rows}
+    return _with_wizard_nav(rows, include_back=True)
 
 
 def diet_regen_duration_choice_markup(diet_id: int) -> dict:
@@ -49,8 +58,7 @@ def diet_regen_duration_choice_markup(diet_id: int) -> dict:
             row = []
     if row:
         rows.append(row)
-    rows.append([{"text": "Cancelar", "callback_data": "flow:cancel"}])
-    return {"inline_keyboard": rows}
+    return _with_wizard_nav(rows, include_back=True)
 
 
 def diet_meals_prompt_message() -> str:
@@ -61,8 +69,8 @@ def diet_meals_prompt_message() -> str:
 
 
 def diet_meals_choice_markup(patient_id: int) -> dict:
-    return {
-        "inline_keyboard": [
+    return _with_wizard_nav(
+        [
             [
                 {"text": "2 comidas", "callback_data": f"diet:meals:2:{patient_id}"},
                 {"text": "3 comidas", "callback_data": f"diet:meals:3:{patient_id}"},
@@ -71,9 +79,9 @@ def diet_meals_choice_markup(patient_id: int) -> dict:
                 {"text": "4 comidas", "callback_data": f"diet:meals:4:{patient_id}"},
                 {"text": "5 comidas", "callback_data": f"diet:meals:5:{patient_id}"},
             ],
-            [{"text": "Cancelar", "callback_data": "flow:cancel"}],
-        ]
-    }
+        ],
+        include_back=True,
+    )
 
 
 def diet_confirm_body(
@@ -111,8 +119,8 @@ def diet_strategy_mode_prompt_message() -> str:
 
 
 def diet_strategy_mode_markup(patient_id: int) -> dict:
-    return {
-        "inline_keyboard": [
+    return _with_wizard_nav(
+        [
             [
                 {
                     "text": "Automático",
@@ -129,9 +137,9 @@ def diet_strategy_mode_markup(patient_id: int) -> dict:
                     "callback_data": f"diet:smd:m:{patient_id}",
                 },
             ],
-            [{"text": "Cancelar", "callback_data": "flow:cancel"}],
-        ]
-    }
+        ],
+        include_back=True,
+    )
 
 
 def diet_strategy_style_prompt_message() -> str:
@@ -142,8 +150,8 @@ def diet_strategy_style_prompt_message() -> str:
 
 
 def diet_strategy_style_markup(patient_id: int) -> dict:
-    return {
-        "inline_keyboard": [
+    return _with_wizard_nav(
+        [
             [
                 {
                     "text": "Sin estilo",
@@ -174,9 +182,9 @@ def diet_strategy_style_markup(patient_id: int) -> dict:
                     "callback_data": f"diet:sty:m:{patient_id}",
                 },
             ],
-            [{"text": "Cancelar", "callback_data": "flow:cancel"}],
-        ]
-    }
+        ],
+        include_back=True,
+    )
 
 
 def diet_macro_protein_prompt_message() -> str:
@@ -184,17 +192,17 @@ def diet_macro_protein_prompt_message() -> str:
 
 
 def diet_macro_protein_markup() -> dict:
-    return {
-        "inline_keyboard": [
+    return _with_wizard_nav(
+        [
             [
                 {"text": "Baja", "callback_data": "diet:mp:l"},
                 {"text": "Normal", "callback_data": "diet:mp:n"},
                 {"text": "Alta", "callback_data": "diet:mp:h"},
             ],
             [{"text": "Omitir", "callback_data": "diet:mp:s"}],
-            [{"text": "Cancelar", "callback_data": "flow:cancel"}],
-        ]
-    }
+        ],
+        include_back=True,
+    )
 
 
 def diet_macro_carbs_prompt_message() -> str:
@@ -202,17 +210,17 @@ def diet_macro_carbs_prompt_message() -> str:
 
 
 def diet_macro_carbs_markup() -> dict:
-    return {
-        "inline_keyboard": [
+    return _with_wizard_nav(
+        [
             [
                 {"text": "Baja", "callback_data": "diet:mc:l"},
                 {"text": "Normal", "callback_data": "diet:mc:n"},
                 {"text": "Alta", "callback_data": "diet:mc:h"},
             ],
             [{"text": "Omitir", "callback_data": "diet:mc:s"}],
-            [{"text": "Cancelar", "callback_data": "flow:cancel"}],
-        ]
-    }
+        ],
+        include_back=True,
+    )
 
 
 def diet_macro_fat_prompt_message() -> str:
@@ -220,17 +228,17 @@ def diet_macro_fat_prompt_message() -> str:
 
 
 def diet_macro_fat_markup() -> dict:
-    return {
-        "inline_keyboard": [
+    return _with_wizard_nav(
+        [
             [
                 {"text": "Baja", "callback_data": "diet:mf:l"},
                 {"text": "Normal", "callback_data": "diet:mf:n"},
                 {"text": "Alta", "callback_data": "diet:mf:h"},
             ],
             [{"text": "Omitir", "callback_data": "diet:mf:s"}],
-            [{"text": "Cancelar", "callback_data": "flow:cancel"}],
-        ]
-    }
+        ],
+        include_back=True,
+    )
 
 
 def diet_manual_kcal_prompt_message() -> str:
@@ -268,8 +276,8 @@ def diet_confirm_markup(patient_id: int) -> dict:
 
 
 def diet_note_offer_markup(patient_id: int) -> dict:
-    return {
-        "inline_keyboard": [
+    return _with_wizard_nav(
+        [
             [
                 {
                     "text": "Sí, agregar nota",
@@ -280,9 +288,9 @@ def diet_note_offer_markup(patient_id: int) -> dict:
                     "callback_data": f"diet:note:no:{patient_id}",
                 },
             ],
-            [{"text": "Cancelar", "callback_data": f"diet:cancel:{patient_id}"}],
-        ]
-    }
+        ],
+        include_back=True,
+    )
 
 
 def diet_preview_markup(diet_id: int) -> dict:
@@ -292,6 +300,16 @@ def diet_preview_markup(diet_id: int) -> dict:
                 {
                     "text": "Aprobar y enviar PDF",
                     "callback_data": f"diet:preview:approve:{diet_id}",
+                },
+            ],
+            [
+                {
+                    "text": "Detalle 7 días (comidas)",
+                    "callback_data": f"diet:preview:fulldays:{diet_id}",
+                },
+                {
+                    "text": "Editar una comida",
+                    "callback_data": f"diet:preview:editpick:{diet_id}",
                 },
             ],
             [

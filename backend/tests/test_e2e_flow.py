@@ -21,8 +21,29 @@ try:
 except ImportError:
     pass
 
+import psycopg2
+
+from app.core.config import settings, to_sync_database_url
 from app.demo_seed import DEMO_DOCTOR_EMAIL, DEMO_DOCTOR_PASSWORD
 from app.main import app
+
+
+def _clear_telegram_processed_updates() -> None:
+    """El webhook descarta `update_id` ya vistos; sin esto, los e2e con ids fijos fallan al
+    repetir pytest contra la misma base (p. ej. volúmen Docker)."""
+    try:
+        url = to_sync_database_url(settings.DATABASE_URL)
+        conn = psycopg2.connect(url)
+    except Exception as exc:  # noqa: BLE001
+        if os.environ.get("E2E_VERBOSE"):
+            print(f"skip TRUNCATE telegram_processed_updates: {exc}", file=sys.stderr)
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("TRUNCATE telegram_processed_updates")
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _skip_if_no_db_output(msg: str) -> None:
@@ -54,6 +75,11 @@ def seeded():
 def client():
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture(autouse=True, scope="function")
+def _e2e_clear_telegram_update_dedup() -> None:
+    _clear_telegram_processed_updates()
 
 
 @pytest.mark.usefixtures("seeded")

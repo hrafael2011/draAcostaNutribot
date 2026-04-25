@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plan Nutricional: kevin</title>
+  <style>
+    :root {
+      --page-width: 1123px;
+      --page-min-height: 794px;
+      --content-scale: 0.84;
+      --header-purple: #b09fcb;
+      --row-purple: #d9d4e5;
+      --border: #d1ccd8;
+      --note-bg: #eef0fa;
+      --note-accent: #7d91c1;
+      --note-title: #50628e;
+      --text: #181818;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    @page {
+      size: A4 landscape;
+      margin: 0;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+    }
+
+    .page {
+      width: 100%;
+      max-width: var(--page-width);
+      min-height: var(--page-min-height);
+      padding: 8px 12px 18px;
+      overflow: hidden;
+    }
+
+    .page-inner {
+      width: calc(100% / var(--content-scale));
+      transform: scale(var(--content-scale));
+      transform-origin: top left;
+    }
+
+    .top-meta {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      margin-bottom: 4px;
+      padding-right: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #111111;
+    }
+
+    .brand {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 28px;
+      margin: 2px 0 14px;
+    }
+
+    .brand-logo {
+      width: 142px;
+      height: auto;
+      display: block;
+      object-fit: contain;
+      image-rendering: auto;
+      filter: contrast(1.08) saturate(1.05);
+    }
+
+    .brand-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      color: #0b0b0b;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    col.day {
+      width: 3.8%;
+    }
+
+    col.breakfast {
+      width: 27.6%;
+    }
+
+    col.lunch {
+      width: 27.8%;
+    }
+
+    col.snack {
+      width: 14.4%;
+    }
+
+    col.dinner {
+      width: 26.4%;
+    }
+
+    thead th {
+      padding: 8px 8px;
+      border: 1px solid var(--border);
+      background: var(--header-purple);
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    tbody td {
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      line-height: 1.45;
+      vertical-align: top;
+      text-align: justify;
+      text-justify: inter-word;
+      word-break: normal;
+    }
+
+    tbody tr:nth-child(even) td {
+      background: var(--row-purple);
+    }
+
+    td.day-cell {
+      padding: 12px 8px;
+      font-size: 13px;
+      text-align: center;
+      vertical-align: middle;
+    }
+
+    .note {
+      margin-top: 10px;
+      border-left: 8px solid var(--note-accent);
+      background: var(--note-bg);
+      padding: 18px 22px;
+      font-size: 18px;
+      line-height: 1.35;
+      color: #343434;
+    }
+
+    .note strong {
+      color: var(--note-title);
+    }
+
+    @media (max-width: 1160px) {
+      body {
+        justify-content: flex-start;
+      }
+
+      .page {
+        max-width: none;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+
+      .page-inner {
+        min-width: calc(var(--page-width) / var(--content-scale));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="page-inner">
+      <div class="top-meta">Fecha: 26/10/2025</div>
+
+      <section class="brand" aria-label="Encabezado del plan nutricional">
+        <img class="brand-logo" src="logo_nitido.png" alt="Logo Dra. Acosta Fit">
+        <h1 class="brand-title">Plan Nutricional: kevin</h1>
+      </section>
+
+      <table aria-label="Plan nutricional semanal">
+        <colgroup>
+          <col class="day">
+          <col class="breakfast">
+          <col class="lunch">
+          <col class="snack">
+          <col class="dinner">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Día</th>
+            <th>Desayuno</th>
+            <th>Almuerzo</th>
+            <th>Merienda</th>
+            <th>Cena</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="day-cell">1</td>
+            <td>2 huevos revueltos (140g) con espinacas salteadas (100g) y 1 rebanada de pan integral tostado (30g), cocido en 1 cucharadita de aceite de oliva.</td>
+            <td>150g de pechuga de pollo a la plancha con 200g de brócoli al vapor y 100g de quinoa cocida, aderezado con limón y pimienta.</td>
+            <td>1 manzana mediana (150g) y 30g de almendras.</td>
+            <td>200g de pavo molido salteado con 1 taza de pimientos asados (150g) y 1 taza de arroz integral cocido (150g).</td>
+          </tr>
+          <tr>
+            <td class="day-cell">2</td>
+            <td>1 taza de yogur natural (240g) con 100g de fresas y 30g de granola sin azúcar.</td>
+            <td>Ensalada de 150g de pechuga de pavo, 100g de espinacas, 50g de aguacate, 50g de tomates cherry y 1 cucharada de aceite de oliva.</td>
+            <td>1 plátano (120g) y 2 cucharadas de mantequilla de almendra.</td>
+            <td>200g de pollo al horno con especias, 150g de batatas asadas y 100g de judías verdes al vapor.</td>
+          </tr>
+          <tr>
+            <td class="day-cell">3</td>
+            <td>Smoothie de 1 plátano (120g), 1 taza de leche de almendra (240ml)</td>
+            <td>Wrap de 150g de pechuga de pollo en tortilla integral (60g) con lechuga, tomate y 30g de hummus.</td>
+            <td>1 pera mediana (150g) y 15g de nueces.</td>
+            <td>200g de carne magra de res a la parrilla con 150g de calabacín asado y 100g de arroz basmati cocido.</td>
+          </tr>
+          <tr>
+            <td class="day-cell">4</td>
+            <td>3 claras de huevo (100g) con 50g de champiñones salteados y 1 rebanada de pan integral (30g).</td>
+            <td>150g de pollo al curry con 200g de coliflor al vapor y 100g de cuscús.</td>
+            <td>1 naranja mediana (130g) y 30g de semillas de girasol.</td>
+            <td>200g de pavo al horno con 150g de zanahorias asadas y 100g de puré de patatas.</td>
+          </tr>
+          <tr>
+            <td class="day-cell">5</td>
+            <td>1 taza de avena cocida (240ml) con 1 cucharada de miel y 30g de arándanos.</td>
+            <td>Sopa de 200g de lentejas con verduras (zanahorias, apio, cebolla) y 50g de pan integral.</td>
+            <td>1 batido de 240ml de leche de almendra con fresa y 1 plátano (120g).</td>
+            <td>200g de pollo a la parrilla con 100g de espárragos y 100g de arroz integral.</td>
+          </tr>
+          <tr>
+            <td class="day-cell">6</td>
+            <td>2 tortillas integrales (60g) con 2 huevos revueltos (140g) y 50g de aguacate.</td>
+            <td>Ensalada de 150g de pollo a la parrilla, 100g de lechuga, 50g de zanahoria rallada y 1 cucharada de aderezo de yogur.</td>
+            <td>1 manzana (150g) y 30g de nueces.</td>
+            <td>200g de carne magra de res al horno con 200g de espinacas salteadas en 1 cucharadita de aceite de oliva.</td>
+          </tr>
+          <tr>
+            <td class="day-cell">7</td>
+            <td>1 taza de yogur griego (240g) con 100g de mango y 30g de semillas de chía.</td>
+            <td>150g de pechuga de pavo en rodajas con 100g de espárragos y 100g de quinoa.</td>
+            <td>1 plátano (120g) y 2 cucharadas de mantequilla de almendra.</td>
+            <td>200g de pollo al horno con 150g de brócoli y 100g de arroz integral.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="note">
+        <strong>Recomendaciones:</strong> consumir mínimo entre 8 a 10 vasos de agua y dormir de 7 a 8 horas al día, los aderezos limón, sal y aceite de oliva.
+      </div>
+    </div>
+  </main>
+</body>
+</html>

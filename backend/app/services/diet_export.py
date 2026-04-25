@@ -1,4 +1,5 @@
 import json
+import subprocess
 from io import BytesIO
 from typing import Any, Optional
 from xml.sax.saxutils import escape
@@ -10,6 +11,10 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.models import Diet, Doctor, Patient, PatientMetrics, PatientProfile
+from app.services.diet_export_html import (
+    HtmlPdfExportError,
+    build_official_diet_export_pdf_bytes,
+)
 from app.services.doctor_assistant_service import calc_age
 from app.services.plan_meals import (
     extract_day_meals,
@@ -57,6 +62,12 @@ def _daily_energy_block_lines(
         if age is not None:
             lines.append(f"Edad: {age} años")
     return lines
+
+
+def _daily_energy_inline_line(
+    patient: Optional[Patient], plan: dict[str, Any]
+) -> str:
+    return " · ".join(_daily_energy_block_lines(patient, plan))
 
 
 def build_diet_export_text(
@@ -162,7 +173,7 @@ def _collect_recommendation_lines(plan: Any) -> list[str]:
     return out
 
 
-def build_diet_export_pdf_bytes(
+def _build_diet_export_pdf_bytes_reportlab(
     diet: Diet,
     *,
     patient: Optional[Patient] = None,
@@ -188,14 +199,23 @@ def build_diet_export_pdf_bytes(
     warm_alt = colors.HexColor("#fcfaf7")
     border = colors.HexColor("#b8b0a1")
 
-    style_banner = ParagraphStyle(
-        "Banner",
+    style_meta = ParagraphStyle(
+        "Meta",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8.5,
+        leading=10.5,
+        textColor=colors.HexColor("#2a2a2a"),
+    )
+    style_plan_title = ParagraphStyle(
+        "PlanTitle",
         parent=styles["Normal"],
         fontName="Helvetica-Bold",
-        fontSize=10,
-        leading=12,
-        textColor=colors.white,
-        alignment=1,
+        fontSize=11,
+        leading=13,
+        textColor=accent,
+        spaceBefore=2,
+        spaceAfter=4,
     )
     style_section = ParagraphStyle(
         "Section",
@@ -235,31 +255,21 @@ def build_diet_export_pdf_bytes(
         leftIndent=10,
         bulletIndent=4,
     )
-    style_kcal_title = ParagraphStyle(
-        "KcalTitle",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=11,
-        leading=13,
-        textColor=accent,
-        spaceAfter=4,
-    )
-    style_kcal_body = ParagraphStyle(
-        "KcalBody",
+    style_kcal_inline = ParagraphStyle(
+        "KcalInline",
         parent=styles["Normal"],
         fontName="Helvetica",
-        fontSize=8.5,
-        leading=10.5,
+        fontSize=8.2,
+        leading=10,
         textColor=colors.HexColor("#2a2a2a"),
-        spaceAfter=3,
+        alignment=0,
     )
 
-    patient_name = "Paciente"
+    patient_short_name = "Paciente"
     if patient:
-        patient_name = f"{patient.first_name} {patient.last_name}".strip()
+        patient_short_name = (patient.first_name or "Paciente").strip()
 
     fecha = diet.created_at.strftime("%d/%m/%Y")
-    banner_text = f"<b>PLAN NUTRICIONAL · {patient_name.upper()} · {fecha}</b>"
 
     plan: Any = diet.structured_plan_json or {}
     if not isinstance(plan, dict):
@@ -274,34 +284,37 @@ def build_diet_export_pdf_bytes(
 
     story: list[Any] = []
 
-    # ── Encabezado ──────────────────────────────────────────────────────────
-    banner = Table(
-        [[Paragraph(banner_text, style_banner)]],
+    # ── Encabezado estilo sample ───────────────────────────────────────────
+    story.append(Paragraph(f"<b>Fecha:</b> {_xml_para(fecha)}", style_meta))
+
+    # ── Calorías/macros/edad: una sola línea bajo fecha ─
+    kcal_line = _daily_energy_inline_line(patient, plan)
+    kcal_block = Table(
+        [[Paragraph(_xml_para(kcal_line), style_kcal_inline)]],
         colWidths=[doc.width],
     )
-    banner.setStyle(
+    kcal_block.setStyle(
         TableStyle(
             [
-                ("BACKGROUND", (0, 0), (-1, -1), accent),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+                ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+                ("TOPPADDING", (0, 0), (-1, -1), 0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ]
         )
     )
-    story.append(banner)
-    story.append(Spacer(1, 0.18 * cm))
-
-    # ── Calorías y contexto (sin nota del doctor ni datos clínicos del perfil) ─
-    for i, line in enumerate(_daily_energy_block_lines(patient, plan)):
-        if i == 0:
-            story.append(Paragraph(_xml_para(line), style_kcal_title))
-        else:
-            story.append(Paragraph(_xml_para(line), style_kcal_body))
-    story.append(Spacer(1, 0.12 * cm))
+    story.append(kcal_block)
+    story.append(Spacer(1, 0.08 * cm))
+    story.append(
+        Paragraph(
+            f"Plan Nutricional: {_xml_para(patient_short_name)}",
+            style_plan_title,
+        )
+    )
+    story.append(Spacer(1, 0.06 * cm))
 
     # ── Tabla 7 días ─────────────────────────────────────────────────────────
-    story.append(Paragraph("<b>Distribución semanal de comidas</b>", style_section))
 
     days_data: list[dict] = []
     if isinstance(plan.get("days"), list):
@@ -360,3 +373,29 @@ def build_diet_export_pdf_bytes(
 
     doc.build(story)
     return buf.getvalue()
+
+
+def build_diet_export_pdf_bytes(
+    diet: Diet,
+    *,
+    patient: Optional[Patient] = None,
+    profile: Optional[PatientProfile] = None,
+    metrics: Optional[PatientMetrics] = None,
+    doctor: Optional[Doctor] = None,
+) -> bytes:
+    """Official patient PDF.
+
+    The HTML renderer is the source of truth for the polished one-page layout.
+    ReportLab remains as a conservative fallback if the browser renderer is not
+    available in a test or degraded runtime.
+    """
+    try:
+        return build_official_diet_export_pdf_bytes(diet, patient=patient)
+    except (HtmlPdfExportError, OSError, subprocess.SubprocessError):
+        return _build_diet_export_pdf_bytes_reportlab(
+            diet,
+            patient=patient,
+            profile=profile,
+            metrics=metrics,
+            doctor=doctor,
+        )

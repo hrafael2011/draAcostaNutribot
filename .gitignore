@@ -17,6 +17,9 @@ frontend/dist/
 *.log
 .DS_Store
 backups/
+.codex
+backend/.tmp_pdf/
 
 # Local sample / personal exports (keep out of git)
 *.pdf
+backend/samples/sample_plan_official_preview.html

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from app.models import Diet, Patient
 from app.nutrition.plan_display import (
@@ -126,3 +126,51 @@ def format_diet_preview_message(
     )
     out = "\n".join(lines)
     return out[:4090]
+
+
+def split_telegram_text_chunks(text: str, max_len: int) -> list[str]:
+    t = (text or "").rstrip() or "—"
+    if len(t) <= max_len:
+        return [t]
+    out: list[str] = []
+    s = 0
+    n = len(t)
+    while s < n:
+        e = min(s + max_len, n)
+        if e < n:
+            chunk = t[s:e]
+            r = chunk.rfind("\n")
+            if r >= max_len // 3:
+                e = s + r + 1
+        out.append(t[s:e].rstrip() or t[s:e])
+        s = e
+    return out or ["—"]
+
+
+def format_telegram_full_day_block(
+    plan: dict[str, Any] | None, day_0: int, *, num_days: int
+) -> str:
+    if not plan or not isinstance(plan, dict):
+        return f"📅 Día {day_0 + 1} (sin plan)"
+    days = plan.get("days")
+    if not isinstance(days, list) or day_0 < 0 or day_0 >= len(days):
+        return f"📅 Día {day_0 + 1} (día no disponible)"
+    d = days[day_0] if isinstance(days[day_0], dict) else None
+    if d is None:
+        return f"📅 Día {day_0 + 1} (sin datos)"
+    slots = resolve_plan_meal_slots(plan)
+    date_s = d.get("date")
+    if date_s not in (None, ""):
+        fe = f"Fecha: {date_s}"
+    else:
+        fe = "Fecha: (sin fecha)"
+    lines: list[str] = [
+        f"📅 Día {day_0 + 1} de {num_days} (ciclo base)",
+        fe,
+    ]
+    for slot, label, raw in extract_day_meals(d, slots):
+        t = (raw or "").strip() or "—"
+        lines.append("")
+        lines.append(f"🍽 {label}")
+        lines.append(t)
+    return "\n".join(lines)

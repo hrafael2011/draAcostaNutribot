@@ -47,11 +47,12 @@ async def send_telegram_message(
     text: str,
     *,
     reply_markup: dict[str, Any] | None = None,
-) -> None:
+) -> int | None:
+    """Envía mensaje. Devuelve message_id de Telegram si la API respondió ok."""
     url = _bot_url("sendMessage")
     if not url:
         logger.warning("Telegram sendMessage skipped: TELEGRAM_BOT_TOKEN not set")
-        return
+        return None
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             payload: dict[str, Any] = {
@@ -67,8 +68,48 @@ async def send_telegram_message(
             _log_telegram_failure(
                 "sendMessage", status_code=resp.status_code, body=body
             )
+            return None
+        result = body.get("result")
+        if isinstance(result, dict):
+            mid = result.get("message_id")
+            if isinstance(mid, int):
+                return mid
+        return None
     except httpx.HTTPError as e:
         logger.error("Telegram sendMessage HTTP error: %s", e)
+        return None
+
+
+async def edit_telegram_message_reply_markup(
+    chat_id: str,
+    message_id: int,
+    *,
+    reply_markup: dict[str, Any] | None = None,
+) -> None:
+    """Quita o sustituye el teclado inline de un mensaje (reply_markup=None → teclado vacío)."""
+    url = _bot_url("editMessageReplyMarkup")
+    if not url:
+        return
+    markup = (
+        reply_markup
+        if reply_markup is not None
+        else {"inline_keyboard": []}
+    )
+    payload: dict[str, Any] = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "reply_markup": markup,
+    }
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(url, json=payload)
+        ok, body = _telegram_ok(resp)
+        if not ok or resp.status_code >= 400:
+            _log_telegram_failure(
+                "editMessageReplyMarkup", status_code=resp.status_code, body=body
+            )
+    except httpx.HTTPError as e:
+        logger.error("Telegram editMessageReplyMarkup HTTP error: %s", e)
 
 
 async def send_telegram_document(
