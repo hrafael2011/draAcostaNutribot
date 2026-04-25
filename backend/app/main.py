@@ -35,7 +35,13 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def create_tables() -> None:
-    """Create all database tables on startup if they don't already exist."""
+    """Create missing tables only in local development.
+
+    Deployed environments run Alembic before Uvicorn starts; running create_all
+    afterwards can race or conflict with versioned migrations.
+    """
+    if settings.is_production:
+        return
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
