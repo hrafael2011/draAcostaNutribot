@@ -28,4 +28,30 @@ async def get_current_doctor(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Inactive or unknown user",
         )
+    if doctor.must_change_password:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Password change required",
+        )
+    return doctor
+
+
+async def get_current_active_doctor(
+    db: AsyncSession = Depends(get_db),
+    token: str = Depends(oauth2_scheme),
+) -> Doctor:
+    try:
+        doctor_id = int(decode_access_token(token))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+        )
+    result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
+    doctor = result.scalar_one_or_none()
+    if doctor is None or not doctor.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Inactive or unknown user",
+        )
     return doctor

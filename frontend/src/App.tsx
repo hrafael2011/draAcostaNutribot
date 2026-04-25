@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from "react-router-dom"
 import RequireAuth from "./components/RequireAuth"
 import AdminLayout from "./layouts/AdminLayout"
 import Login from "./pages/Login"
+import ChangePassword from "./pages/ChangePassword"
 import Dashboard from "./pages/Dashboard"
 import Patients from "./pages/Patients"
 import PatientDetail from "./pages/PatientDetail"
@@ -16,6 +17,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/change-password" element={<ChangePassword />} />
       <Route path="/intake/:token" element={<PublicIntake />} />
       <Route
         path="/"

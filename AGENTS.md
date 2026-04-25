@@ -33,6 +33,7 @@ Priority areas:
 3. Approved diets should be treated as final clinical output.
 4. Telegram callback safety is critical because duplicate clicks can create inconsistent clinical actions.
 5. The backend is the real source of truth; Telegram UI alone is not sufficient for protection.
+6. The product is not multitenant for now: account creation must be controlled, not public.
 
 ## Docker/runtime notes
 
@@ -43,6 +44,26 @@ Current local container behavior:
 3. Backend changes require rebuild/recreate of the backend container to take effect.
 4. `ngrok` is used for Telegram webhook exposure.
 5. Current backend host mapping is `127.0.0.1:8020 -> 8000`.
+
+## Deployment environments
+
+Vercel project:
+
+- `dra-acosta-nutribot`
+
+Environment routing:
+
+1. Vercel `Production` must use Railway `production`.
+2. Vercel `Preview` for branch `dev` must use Railway `Staging-dev`.
+3. Vercel `Development` must use Railway `Staging-dev` unless explicitly testing against local backend.
+4. Do not point Vercel preview/development to Railway production.
+5. Do not point production UI to staging APIs.
+
+Current frontend API variables:
+
+1. Vercel `Production`: `VITE_API_BASE_URL=https://diet-backend-production-9360.up.railway.app/api`
+2. Vercel `Preview (dev)`: `VITE_API_BASE_URL=https://diet-backend-staging-dev.up.railway.app/api`
+3. Vercel `Development`: `VITE_API_BASE_URL=https://diet-backend-staging-dev.up.railway.app/api`
 
 ## Recent work already completed
 
@@ -105,6 +126,20 @@ Recommended Telegram interaction model:
 3. Keep auditability in mind whenever manual edits are introduced.
 4. If a change affects diet editing or approval, think in terms of versioning.
 5. Prioritize consistency and traceability over clever UI shortcuts.
+
+## Account and access model
+
+1. Public doctor registration must stay disabled in production.
+2. Accounts are controlled by an internal administrator, not by an open signup screen.
+3. Users have a `role` such as `admin` or `doctor`.
+4. Temporary passwords must set `must_change_password = true`.
+5. A user with `must_change_password = true` may only change their password; clinical/admin routes must remain blocked.
+6. The administrator may create/reset doctor access, but must not know the doctor's final private password.
+7. Admin recovery should happen through a controlled internal script or operational process, not through a public recovery button in this MVP.
+
+Operational bootstrap:
+
+- Use `backend/scripts/bootstrap_admin.py` to create or reset the internal admin account.
 
 ## Working conventions for future sections
 

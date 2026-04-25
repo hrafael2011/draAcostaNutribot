@@ -114,6 +114,8 @@ export type DoctorOut = {
   full_name: string
   email: string
   phone?: string | null
+  role: string
+  must_change_password: boolean
   is_active: boolean
 }
 

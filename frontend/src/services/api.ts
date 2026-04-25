@@ -42,26 +42,36 @@ export async function loginRequest(email: string, password: string) {
   if (!res.ok) {
     throw new Error(await readApiError(res) || "Login failed")
   }
-  const data = (await res.json()) as { access_token: string }
+  const data = (await res.json()) as {
+    access_token: string
+    role: string
+    must_change_password: boolean
+  }
   setStoredToken(data.access_token)
   return data
 }
 
-export async function registerDoctor(payload: {
-  full_name: string
-  email: string
-  password: string
-  phone?: string
-}) {
-  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+export async function changePasswordRequest(
+  currentPassword: string,
+  newPassword: string,
+) {
+  const res = await authFetch("/auth/change-password", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
   })
   if (!res.ok) {
-    throw new Error(await readApiError(res) || "Registration failed")
+    throw new Error(await readApiError(res) || "Password change failed")
   }
-  return res.json() as Promise<{ id: number; email: string }>
+  const data = (await res.json()) as {
+    access_token: string
+    role: string
+    must_change_password: boolean
+  }
+  setStoredToken(data.access_token)
+  return data
 }
 
 export async function fetchRegistrationOpen(): Promise<{ open: boolean }> {

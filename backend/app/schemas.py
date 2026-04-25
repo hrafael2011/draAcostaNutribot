@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    role: str = "doctor"
+    must_change_password: bool = False
 
 
 class DoctorCreate(BaseModel):
@@ -15,6 +17,11 @@ class DoctorCreate(BaseModel):
     phone: Optional[str] = None
 
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class DoctorOut(BaseModel):
     id: int
     full_name: str
@@ -22,6 +29,8 @@ class DoctorOut(BaseModel):
     phone: Optional[str] = None
     telegram_user_id: Optional[str] = None
     telegram_username: Optional[str] = None
+    role: str = "doctor"
+    must_change_password: bool = False
     is_active: bool
 
     model_config = ConfigDict(from_attributes=True)

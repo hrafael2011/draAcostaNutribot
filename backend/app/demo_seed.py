@@ -24,12 +24,17 @@ async def _get_or_create_doctor(session: AsyncSession) -> Doctor:
     )
     doctor = result.scalar_one_or_none()
     if doctor:
+        doctor.role = doctor.role or "doctor"
+        doctor.must_change_password = False
+        doctor.is_active = True
         return doctor
     doctor = Doctor(
         full_name=DEMO_DOCTOR_NAME,
         email=DEMO_DOCTOR_EMAIL.lower(),
         phone="+18095550001",
         hashed_password=get_password_hash(DEMO_DOCTOR_PASSWORD),
+        role="doctor",
+        must_change_password=False,
     )
     session.add(doctor)
     await session.flush()

@@ -30,6 +30,8 @@ class Doctor(Base):
     hashed_password = Column(String(255), nullable=False)
     telegram_user_id = Column(String(40), unique=True, nullable=True)
     telegram_username = Column(String(120), nullable=True)
+    role = Column(String(20), default="doctor", nullable=False)
+    must_change_password = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
