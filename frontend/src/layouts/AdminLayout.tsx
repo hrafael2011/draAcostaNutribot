@@ -13,7 +13,7 @@ const navItems = [
 ]
 
 export default function AdminLayout() {
-  const { logout } = useAuth()
+  const { logout, session } = useAuth()
   const navigate = useNavigate()
   const [me, setMe] = useState<DoctorOut | null>(null)
 
@@ -37,12 +37,17 @@ export default function AdminLayout() {
     }
   }, [logout, navigate])
 
+  const visibleNavItems =
+    (me?.role || session?.role) === "admin"
+      ? [...navItems, { to: "/admin/users", label: "Usuarios" }]
+      : navItems
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", fontFamily: "system-ui, sans-serif" }}>
       <aside style={{ width: 240, padding: 24, borderRight: "1px solid #ddd" }}>
         <div style={{ fontWeight: 700, marginBottom: 16 }}>Diet Admin</div>
         <nav style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

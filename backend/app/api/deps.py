@@ -55,3 +55,14 @@ async def get_current_active_doctor(
             detail="Inactive or unknown user",
         )
     return doctor
+
+
+async def get_current_admin(
+    doctor: Doctor = Depends(get_current_doctor),
+) -> Doctor:
+    if doctor.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return doctor

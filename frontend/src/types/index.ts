@@ -117,6 +117,8 @@ export type DoctorOut = {
   role: string
   must_change_password: boolean
   is_active: boolean
+  telegram_user_id?: string | null
+  telegram_username?: string | null
 }
 
 export type TelegramBindingState = {

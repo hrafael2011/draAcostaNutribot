@@ -13,6 +13,7 @@ import type {
   TelegramBindStart,
   TelegramBindingState,
   DietStrategyMode,
+  DoctorOut,
 } from "../types"
 import { notifyUnauthorized } from "./authBridge"
 
@@ -245,7 +246,50 @@ export function submitIntakeForm(token: string, body: Record<string, unknown>) {
 }
 
 export function getDoctorMe() {
-  return authFetch("/doctors/me").then((r) => parseJson(r))
+  return authFetch("/doctors/me").then((r) => parseJson<DoctorOut>(r))
+}
+
+export function getAdminDoctors() {
+  return authFetch("/admin/doctors").then((r) => parseJson<DoctorOut[]>(r))
+}
+
+export function createAdminDoctor(body: {
+  full_name: string
+  email: string
+  temporary_password: string
+  phone?: string | null
+  role: "admin" | "doctor"
+}) {
+  return authFetch("/admin/doctors", {
+    method: "POST",
+    body: JSON.stringify(body),
+  }).then((r) => parseJson<DoctorOut>(r))
+}
+
+export function updateAdminDoctor(
+  doctorId: number,
+  body: Partial<{
+    full_name: string
+    email: string
+    phone: string | null
+    role: "admin" | "doctor"
+    is_active: boolean
+  }>,
+) {
+  return authFetch(`/admin/doctors/${doctorId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  }).then((r) => parseJson<DoctorOut>(r))
+}
+
+export function resetAdminDoctorPassword(
+  doctorId: number,
+  temporaryPassword: string,
+) {
+  return authFetch(`/admin/doctors/${doctorId}/reset-password`, {
+    method: "POST",
+    body: JSON.stringify({ temporary_password: temporaryPassword }),
+  }).then((r) => parseJson<DoctorOut>(r))
 }
 
 export function getTelegramBinding() {

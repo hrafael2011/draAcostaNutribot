@@ -22,6 +22,26 @@ class PasswordChange(BaseModel):
     new_password: str = Field(min_length=8, max_length=128)
 
 
+class AdminDoctorCreate(BaseModel):
+    full_name: str
+    email: EmailStr
+    temporary_password: str = Field(min_length=8, max_length=128)
+    phone: Optional[str] = None
+    role: Literal["admin", "doctor"] = "doctor"
+
+
+class AdminDoctorUpdate(BaseModel):
+    full_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    role: Optional[Literal["admin", "doctor"]] = None
+    is_active: Optional[bool] = None
+
+
+class AdminPasswordReset(BaseModel):
+    temporary_password: str = Field(min_length=8, max_length=128)
+
+
 class DoctorOut(BaseModel):
     id: int
     full_name: str

@@ -3,6 +3,7 @@ import RequireAuth from "./components/RequireAuth"
 import AdminLayout from "./layouts/AdminLayout"
 import Login from "./pages/Login"
 import ChangePassword from "./pages/ChangePassword"
+import AdminUsers from "./pages/AdminUsers"
 import Dashboard from "./pages/Dashboard"
 import Patients from "./pages/Patients"
 import PatientDetail from "./pages/PatientDetail"
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="diets" element={<Diets />} />
         <Route path="diets/:dietId" element={<DietDetail />} />
         <Route path="telegram" element={<Telegram />} />
+        <Route path="admin/users" element={<AdminUsers />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
