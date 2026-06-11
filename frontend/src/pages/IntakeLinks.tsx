@@ -6,6 +6,7 @@ import {
   getPatients,
   revokeIntakeLink,
 } from "../services/api"
+import ShareButtons from "../components/ShareButtons"
 import type { IntakeLink, Patient } from "../types"
 
 export default function IntakeLinks() {
@@ -16,6 +17,9 @@ export default function IntakeLinks() {
   const [patientId, setPatientId] = useState<number | "">("")
   const [expiresDays, setExpiresDays] = useState(7)
   const [maxUses, setMaxUses] = useState(1)
+  const [createdUrl, setCreatedUrl] = useState<string | null>(null)
+  const [createdPatientName, setCreatedPatientName] = useState("")
+  const [linkType, setLinkType] = useState<"register" | "update">("register")
 
   const patientById = useMemo(() => {
     const m = new Map<number, Patient>()
@@ -47,11 +51,17 @@ export default function IntakeLinks() {
     setMsg(null)
     setError(null)
     try {
-      await createIntakeLink({
+      const newLink = await createIntakeLink({
         patient_id: Number(patientId),
         expires_in_days: expiresDays,
         max_uses: maxUses,
       })
+      const p = patientById.get(Number(patientId))
+      setCreatedPatientName(p ? `${p.first_name} ${p.last_name}` : `#${patientId}`)
+      const frontendBase =
+        (import.meta as any).env?.VITE_FRONTEND_URL || window.location.origin
+      const intakeUrl = `${frontendBase}/intake/${encodeURIComponent(newLink.token)}`
+      setCreatedUrl(intakeUrl)
       setMsg("Link created")
       await refresh()
     } catch (err) {
@@ -131,6 +141,22 @@ export default function IntakeLinks() {
         />
         <button type="submit">Create link</button>
       </form>
+
+      {createdUrl && (
+        <div
+          className="mt-4"
+          style={{ maxWidth: 480, marginBottom: 24 }}
+        >
+          <p className="mb-2 text-sm font-medium text-gray-700">
+            Compartir link:
+          </p>
+          <ShareButtons
+            url={createdUrl}
+            patientName={createdPatientName}
+            type={linkType}
+          />
+        </div>
+      )}
 
       {error && <p style={{ color: "#b00020" }}>{error}</p>}
       {msg && <p style={{ color: "#0a0" }}>{msg}</p>}
