@@ -409,3 +409,19 @@ class ManualTargetsRequest(BaseModel):
     protein_g: Optional[float] = Field(None, gt=0)
     carbs_g: Optional[float] = Field(None, gt=0)
     fat_g: Optional[float] = Field(None, gt=0)
+
+
+# --- Diet approval / discard / quick-adjust / meal edit schemas ---
+
+class DietQuickAdjustRequest(BaseModel):
+    adjustment: str = Field(..., min_length=1, max_length=200)
+
+
+class DietMealUpdate(BaseModel):
+    day_index: int = Field(..., ge=0, le=55)
+    slot_key: str = Field(..., min_length=1, max_length=40)
+    meal_text: str = Field(..., min_length=1, max_length=3500)
+
+
+class DietMealsUpdateRequest(BaseModel):
+    meals: list[DietMealUpdate] = Field(..., min_length=1, max_length=56)
