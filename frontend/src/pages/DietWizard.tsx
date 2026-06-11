@@ -9,6 +9,8 @@ import {
 } from "../types"
 import type { DietGenerateRequest, DietStrategyMode, MealsPerDay, Patient } from "../types"
 import { useDietGeneration } from "../hooks/useDietGeneration"
+import { getPatientSummary } from "../services/api"
+import { useToast } from "../context/ToastContext"
 import WizardContainer from "../components/wizard/WizardContainer"
 import PatientSearchInput from "../components/wizard/PatientSearchInput"
 import WizardNoteStep from "../components/wizard/WizardNoteStep"
@@ -36,16 +38,45 @@ function DietWizardInner() {
   )
   const [step, setStep] = useState<WizardStep>(initialPatientId ? "note" : "patient")
   const { generate } = useDietGeneration()
+  const { addToast } = useToast()
 
-  const handlePatientSelect = useCallback((patient: Patient) => {
+  const [profileChecking, setProfileChecking] = useState(false)
+  const [profileBlocked, setProfileBlocked] = useState<Patient | null>(null)
+
+  const handlePatientSelect = useCallback(async (patient: Patient) => {
     dispatch({ type: "SET_FIELD", field: "patientId", value: patient.id })
     dispatch({
       type: "SET_FIELD",
       field: "patientName",
       value: `${patient.first_name} ${patient.last_name}`,
     })
-    setStep("note")
+
+    setProfileChecking(true)
+    setProfileBlocked(null)
+
+    try {
+      const summary = await getPatientSummary(patient.id)
+      if (summary.profile_flags.is_profile_complete) {
+        setStep("note")
+      } else {
+        setProfileBlocked(patient)
+      }
+    } catch {
+      setStep("note")
+    } finally {
+      setProfileChecking(false)
+    }
   }, [])
+
+  const handleClearPatient = useCallback(() => {
+    dispatch({ type: "SET_FIELD", field: "patientId", value: null })
+    dispatch({ type: "SET_FIELD", field: "patientName", value: "" })
+    setProfileBlocked(null)
+  }, [])
+
+  const handleSendForm = useCallback(() => {
+    addToast("Funcion de envio de formulario proximamente", "info")
+  }, [addToast])
 
   const buildBody = useCallback((): DietGenerateRequest => {
     const body: DietGenerateRequest = {
@@ -126,6 +157,41 @@ function DietWizardInner() {
   const renderStep = () => {
     switch (step) {
       case "patient":
+        if (profileChecking) {
+          return (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-6 w-6 animate-spin rounded-full border-b-2 border-emerald-600" />
+              <span className="ml-3 text-sm text-slate-500">Verificando perfil...</span>
+            </div>
+          )
+        }
+        if (profileBlocked) {
+          return (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <p className="text-sm font-medium text-amber-800">
+                Este paciente necesita completar su perfil antes de generar una dieta. El perfil
+                debe incluir: fecha de nacimiento, sexo, pais, ciudad, objetivo, alergias, alimentos
+                a evitar, y metricas de peso y altura.
+              </p>
+              <div className="mt-4 flex gap-3">
+                <button
+                  type="button"
+                  onClick={handleSendForm}
+                  className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700 transition-colors cursor-pointer"
+                >
+                  Enviar formulario
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClearPatient}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Seleccionar otro paciente
+                </button>
+              </div>
+            </div>
+          )
+        }
         return <PatientSearchInput onSelect={handlePatientSelect} />
       case "note":
         return (

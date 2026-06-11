@@ -222,6 +222,7 @@ export const WIZARD_STEPS: { key: WizardStep; label: string }[] = [
 export type WizardState = {
   patientId: number | null
   patientName: string
+  patientIds: number[]
   doctorInstruction: string
   durationDays: number
   mealsPerDay: MealsPerDay
@@ -242,6 +243,7 @@ export type WizardState = {
 export type WizardAction =
   | { type: "SET_FIELD"; field: string; value: unknown }
   | { type: "SET_DIET"; diet: Diet }
+  | { type: "SET_PATIENT_IDS"; ids: number[] }
   | { type: "RESET" }
 
 export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
@@ -250,6 +252,9 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
   }
   if (action.type === "SET_DIET") {
     return { ...state, generatedDiet: action.diet }
+  }
+  if (action.type === "SET_PATIENT_IDS") {
+    return { ...state, patientIds: action.ids }
   }
   if (action.type === "RESET") {
     return { ...initialWizardState() }
@@ -261,6 +266,7 @@ export function initialWizardState(patientId?: number): WizardState {
   return {
     patientId: patientId ?? null,
     patientName: "",
+    patientIds: [],
     doctorInstruction: "",
     durationDays: 7,
     mealsPerDay: 4,
