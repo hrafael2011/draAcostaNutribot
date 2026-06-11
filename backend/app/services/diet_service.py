@@ -343,6 +343,65 @@ async def discard_diet_preview(
     return diet
 
 
+async def update_diet_meals(
+    db: AsyncSession,
+    doctor: Doctor,
+    diet_id: int,
+    meals: list[dict[str, Any]],
+) -> Diet:
+    """Update specific meals in a pending-approval diet's structured plan."""
+    diet = await _diet_for_update(db, diet_id, doctor.id)
+    if diet is None:
+        raise DietGenerationError("not_found", "Diet not found")
+    if diet.status != "pending_approval":
+        raise DietGenerationError(
+            "invalid_state",
+            "Solo se pueden editar comidas de borradores pendientes de aprobación",
+        )
+
+    plan = dict(diet.structured_plan_json) if isinstance(diet.structured_plan_json, dict) else {}
+    days = plan.get("days")
+    if not isinstance(days, list):
+        raise DietGenerationError("invalid_plan", "El plan no tiene estructura de días")
+
+    for meal_update in meals:
+        day_index = meal_update["day_index"]
+        slot_key = meal_update["slot_key"]
+        meal_text = meal_update["meal_text"]
+
+        if day_index < 0 or day_index >= len(days):
+            continue
+        day = days[day_index]
+        if not isinstance(day, dict):
+            continue
+        meals_dict = day.get("meals") if isinstance(day.get("meals"), dict) else {}
+        old_text = meals_dict.get(slot_key, "") if isinstance(meals_dict, dict) else ""
+        meals_dict[slot_key] = meal_text
+        day["meals"] = meals_dict
+        day[slot_key] = meal_text
+
+        db.add(
+            AuditLog(
+                doctor_id=doctor.id,
+                action="diet_edit_meal_web",
+                entity_type="diet",
+                entity_id=diet.id,
+                payload_json={
+                    "patient_id": diet.patient_id,
+                    "day": day_index + 1,
+                    "slot": slot_key,
+                    "old_text_length": len(str(old_text)),
+                    "new_text_length": len(meal_text),
+                    "channel": "web",
+                },
+            )
+        )
+
+    diet.structured_plan_json = plan
+    diet.updated_at = utcnow()
+    return diet
+
+
 async def regenerate_diet(
     db: AsyncSession,
     doctor: Doctor,
