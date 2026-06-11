@@ -1,10 +1,10 @@
 type ProfileProgressProps = {
   total: number;
   complete: number;
-  incomplete: number;
 };
 
-export function ProfileProgress({ total, complete, incomplete }: ProfileProgressProps) {
+export function ProfileProgress({ total, complete }: ProfileProgressProps) {
+  const incomplete = total - complete;
   const pct = total > 0 ? Math.round((complete / total) * 100) : 0;
   return (
     <div className="space-y-4">

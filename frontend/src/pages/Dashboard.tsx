@@ -190,7 +190,6 @@ export default function Dashboard() {
           <ProfileProgress
             total={data.total_patients}
             complete={complete}
-            incomplete={data.incomplete_profiles}
           />
         </motion.div>
       </div>

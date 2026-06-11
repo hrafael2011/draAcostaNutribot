@@ -1,10 +1,26 @@
 import { Avatar } from "../ui/Avatar";
 
-type Activity = Record<string, unknown> & {
+interface Activity {
+  id?: number;
   action?: string;
   entity_type?: string;
+  entity_id?: number;
   patient_name?: string;
+  doctor_name?: string;
   created_at?: string;
+  [key: string]: unknown;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  diet_generated: "Dieta generada para {patient}",
+  diet_regenerated: "Dieta regenerada para {patient}",
+  diet_approved: "Dieta aprobada para {patient}",
+  patient_created: "Paciente {patient} creado",
+  patient_updated: "Paciente {patient} actualizado",
+  intake_link_created: "Formulario enviado a {patient}",
+  intake_submitted: "Formulario completado por {patient}",
+  metric_added: "Metricas registradas para {patient}",
+  profile_updated: "Perfil actualizado de {patient}",
 };
 
 function timeAgo(dateStr: string): string {
@@ -16,18 +32,15 @@ function timeAgo(dateStr: string): string {
   const diffHrs = Math.floor(diffMin / 60);
   if (diffHrs < 24) return `Hace ${diffHrs} h`;
   const diffDays = Math.floor(diffHrs / 24);
-  if (diffDays < 7) return `Hace ${diffDays} días`;
+  if (diffDays < 7) return `Hace ${diffDays} dias`;
   return new Date(dateStr).toLocaleDateString("es-VE", { day: "numeric", month: "short" });
 }
 
 function describeAction(a: Activity): string {
-  const action = (a.action as string) ?? "";
-  const patient = (a.patient_name as string) ?? "paciente";
-  if (action.includes("diet")) return `Dieta generada para ${patient}`;
-  if (action.includes("patient_created")) return `Paciente ${patient} creado`;
-  if (action.includes("intake")) return `Formulario enviado a ${patient}`;
-  if (action.includes("metric")) return `Métricas registradas para ${patient}`;
-  if (action.includes("profile")) return `Perfil actualizado de ${patient}`;
+  const action = a.action ?? "";
+  const patient = a.patient_name ?? "paciente";
+  const template = ACTION_LABELS[action];
+  if (template) return template.replace("{patient}", patient);
   return `${action} — ${patient}`;
 }
 
@@ -37,14 +50,14 @@ export function ActivityTimeline({ activities }: { activities: Activity[] }) {
   }
   return (
     <div className="space-y-1 max-h-[400px] overflow-y-auto">
-      {activities.slice(0, 10).map((a, i) => (
-        <div key={i} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
-          <Avatar firstName={(a.patient_name as string) ?? "?"} lastName="" size="sm" />
+      {activities.slice(0, 10).map((a) => (
+        <div key={a.id ?? `${a.action}-${a.patient_name}-${a.created_at}`} className="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-slate-50 transition-colors">
+          <Avatar firstName={a.patient_name ?? "?"} lastName="" size="sm" />
           <div className="flex-1 min-w-0">
             <p className="text-sm text-slate-700 truncate">{describeAction(a)}</p>
           </div>
           <span className="text-xs text-slate-400 shrink-0">
-            {a.created_at ? timeAgo(a.created_at as string) : ""}
+            {a.created_at ? timeAgo(a.created_at) : ""}
           </span>
         </div>
       ))}
