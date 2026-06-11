@@ -179,6 +179,22 @@ export type PaginatedDiets = {
   page_size: number
 }
 
+export type DietGenerateRequest = {
+  patient_id: number
+  doctor_instruction?: string | null
+  duration_days?: number
+  meals_per_day?: 2 | 3 | 4 | 5
+  strategy_mode?: DietStrategyMode
+  diet_style?: string | null
+  macro_mode?: { protein?: string; carbs?: string; fat?: string } | null
+  manual_targets?: {
+    daily_calories?: number
+    protein_g?: number
+    carbs_g?: number
+    fat_g?: number
+  } | null
+}
+
 // --- Wizard types ---
 
 export type WizardStep =

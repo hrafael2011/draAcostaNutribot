@@ -10,6 +10,7 @@ import PatientDetail from "./pages/PatientDetail"
 import IntakeLinks from "./pages/IntakeLinks"
 import Diets from "./pages/Diets"
 import DietDetail from "./pages/DietDetail"
+import DietWizard from "./pages/DietWizard"
 import Telegram from "./pages/Telegram"
 import PublicIntake from "./pages/PublicIntake"
 import NotFound from "./pages/NotFound"
@@ -33,6 +34,8 @@ export default function App() {
         <Route path="patients" element={<Patients />} />
         <Route path="patients/:patientId" element={<PatientDetail />} />
         <Route path="intake-links" element={<IntakeLinks />} />
+        <Route path="diets/new" element={<DietWizard />} />
+        <Route path="diets/:dietId/regenerate" element={<DietWizard />} />
         <Route path="diets" element={<Diets />} />
         <Route path="diets/:dietId" element={<DietDetail />} />
         <Route path="telegram" element={<Telegram />} />

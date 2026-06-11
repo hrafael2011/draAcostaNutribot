@@ -1,0 +1,233 @@
+import { useReducer, useState, useCallback } from "react"
+import { useNavigate, useSearchParams } from "react-router-dom"
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
+import {
+  wizardReducer,
+  initialWizardState,
+  type WizardStep,
+  type WizardState,
+} from "../types"
+import type { DietGenerateRequest, DietStrategyMode, MealsPerDay, Patient } from "../types"
+import { useDietGeneration } from "../hooks/useDietGeneration"
+import WizardContainer from "../components/wizard/WizardContainer"
+import PatientSearchInput from "../components/wizard/PatientSearchInput"
+import WizardNoteStep from "../components/wizard/WizardNoteStep"
+import DurationPresets from "../components/wizard/DurationPresets"
+import MealCountSelector from "../components/wizard/MealCountSelector"
+import StrategyModeCards from "../components/wizard/StrategyModeCards"
+import DietStyleCards from "../components/wizard/DietStyleCards"
+import MacroPreferences from "../components/wizard/MacroPreferences"
+import ManualTargets from "../components/wizard/ManualTargets"
+import WizardConfirm from "../components/wizard/WizardConfirm"
+import WizardNavigation from "../components/wizard/WizardNavigation"
+import DietPreviewPanel from "../components/diet/DietPreviewPanel"
+
+const queryClient = new QueryClient()
+
+function DietWizardInner() {
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const patientParam = searchParams.get("patient")
+  const initialPatientId = patientParam ? Number(patientParam) : undefined
+
+  const [state, dispatch] = useReducer(
+    wizardReducer,
+    initialWizardState(initialPatientId),
+  )
+  const [step, setStep] = useState<WizardStep>(initialPatientId ? "note" : "patient")
+  const { generate } = useDietGeneration()
+
+  const handlePatientSelect = useCallback((patient: Patient) => {
+    dispatch({ type: "SET_FIELD", field: "patientId", value: patient.id })
+    dispatch({
+      type: "SET_FIELD",
+      field: "patientName",
+      value: `${patient.first_name} ${patient.last_name}`,
+    })
+    setStep("note")
+  }, [])
+
+  const buildBody = useCallback((): DietGenerateRequest => {
+    const body: DietGenerateRequest = {
+      patient_id: state.patientId!,
+      duration_days: state.durationDays,
+      meals_per_day: state.mealsPerDay as MealsPerDay,
+      strategy_mode: state.strategyMode as DietStrategyMode,
+    }
+    if (state.doctorInstruction.trim()) {
+      body.doctor_instruction = state.doctorInstruction.trim()
+    }
+    if (state.strategyMode === "guided") {
+      if (state.dietStyle) body.diet_style = state.dietStyle
+      const macro: Record<string, string> = {}
+      if (state.macroProtein) macro.protein = state.macroProtein
+      if (state.macroCarbs) macro.carbs = state.macroCarbs
+      if (state.macroFat) macro.fat = state.macroFat
+      if (Object.keys(macro).length)
+        body.macro_mode = macro as DietGenerateRequest["macro_mode"]
+    }
+    if (state.strategyMode === "manual") {
+      const mt: Record<string, number> = {}
+      if (state.manualKcal) mt.daily_calories = Number(state.manualKcal)
+      if (state.manualProteinG) mt.protein_g = Number(state.manualProteinG)
+      if (state.manualCarbsG) mt.carbs_g = Number(state.manualCarbsG)
+      if (state.manualFatG) mt.fat_g = Number(state.manualFatG)
+      if (Object.keys(mt).length)
+        body.manual_targets = mt as DietGenerateRequest["manual_targets"]
+    }
+    return body
+  }, [state])
+
+  const handleGenerate = useCallback(async () => {
+    const body = buildBody()
+    const result = await generate.mutateAsync(body)
+    dispatch({ type: "SET_DIET", diet: result })
+    setStep("preview")
+  }, [buildBody, generate])
+
+  const stepOrder: WizardStep[] = [
+    "patient", "note", "duration", "meals", "strategy", "confirm", "preview",
+  ]
+  const currentIndex = stepOrder.indexOf(step)
+
+  const goNext = useCallback(() => {
+    if (currentIndex < stepOrder.length - 1) {
+      const next = stepOrder[currentIndex + 1]
+      if (next === "confirm" && state.strategyMode === "guided" && !state.dietStyle) {
+        setStep("guided_style")
+      } else if (next === "confirm" && state.strategyMode === "guided" && state.dietStyle) {
+        setStep("guided_macros")
+      } else if (next === "confirm" && state.strategyMode === "manual") {
+        setStep("manual_targets")
+      } else {
+        setStep(next)
+      }
+    }
+  }, [currentIndex, state.strategyMode, state.dietStyle])
+
+  const goBack = useCallback(() => {
+    if (currentIndex > 0) {
+      const prev = stepOrder[currentIndex - 1]
+      if (prev === "strategy" && state.strategyMode === "guided") {
+        setStep("guided_macros")
+      } else if (prev === "strategy" && state.strategyMode === "manual") {
+        setStep("manual_targets")
+      } else {
+        setStep(prev)
+      }
+    }
+  }, [currentIndex, state.strategyMode])
+
+  const getTitle = (): string => {
+    if (state.isRegeneration) return "Regenerar Dieta"
+    return "Nueva Dieta"
+  }
+
+  const renderStep = () => {
+    switch (step) {
+      case "patient":
+        return <PatientSearchInput onSelect={handlePatientSelect} />
+      case "note":
+        return (
+          <WizardNoteStep
+            value={state.doctorInstruction}
+            onChange={(v) => dispatch({ type: "SET_FIELD", field: "doctorInstruction", value: v })}
+            onSkip={() => setStep("duration")}
+          />
+        )
+      case "duration":
+        return (
+          <DurationPresets
+            value={state.durationDays}
+            onChange={(v) => dispatch({ type: "SET_FIELD", field: "durationDays", value: v })}
+          />
+        )
+      case "meals":
+        return (
+          <MealCountSelector
+            value={state.mealsPerDay}
+            onChange={(v) => dispatch({ type: "SET_FIELD", field: "mealsPerDay", value: v })}
+          />
+        )
+      case "strategy":
+        return (
+          <StrategyModeCards
+            value={state.strategyMode}
+            onChange={(v) => dispatch({ type: "SET_FIELD", field: "strategyMode", value: v })}
+          />
+        )
+      case "guided_style":
+        return (
+          <DietStyleCards
+            value={state.dietStyle}
+            onChange={(v) => dispatch({ type: "SET_FIELD", field: "dietStyle", value: v })}
+            onNext={() => setStep("guided_macros")}
+          />
+        )
+      case "guided_macros":
+        return (
+          <MacroPreferences
+            protein={state.macroProtein}
+            carbs={state.macroCarbs}
+            fat={state.macroFat}
+            onChange={(f, v) => dispatch({ type: "SET_FIELD", field: f, value: v })}
+            onNext={() => setStep("confirm")}
+          />
+        )
+      case "manual_targets":
+        return (
+          <ManualTargets
+            kcal={state.manualKcal}
+            protein={state.manualProteinG}
+            carbs={state.manualCarbsG}
+            fat={state.manualFatG}
+            onChange={(f, v) => dispatch({ type: "SET_FIELD", field: f, value: v })}
+            onNext={() => setStep("confirm")}
+          />
+        )
+      case "confirm":
+        return (
+          <WizardConfirm
+            state={state}
+            onGenerate={handleGenerate}
+            loading={generate.isPending}
+          />
+        )
+      case "preview":
+        return state.generatedDiet ? <DietPreviewPanel diet={state.generatedDiet} /> : null
+      default:
+        return null
+    }
+  }
+
+  return (
+    <WizardContainer current={step} title={getTitle()}>
+      {renderStep()}
+
+      {generate.isError && (
+        <div className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+          {(generate.error as Error)?.message || "Error al generar la dieta"}
+        </div>
+      )}
+
+      <WizardNavigation
+        step={step}
+        onBack={goBack}
+        onNext={goNext}
+        hideNext={["patient", "confirm", "preview", "guided_style", "guided_macros", "manual_targets"].includes(step)}
+        disableNext={
+          (step === "patient" && !state.patientId) ||
+          (step === "preview")
+        }
+      />
+    </WizardContainer>
+  )
+}
+
+export default function DietWizard() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <DietWizardInner />
+    </QueryClientProvider>
+  )
+}
