@@ -63,7 +63,10 @@ async def generate_diet_plan_json(
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not set")
 
-    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+    client = AsyncOpenAI(
+        api_key=settings.OPENAI_API_KEY,
+        base_url=settings.OPENAI_BASE_URL,
+    )
     system = (
         "Eres un asistente experto en planificación nutricional (no sustituyes criterio médico). "
         "Responde SOLO con JSON válido (sin markdown, sin texto extra). "

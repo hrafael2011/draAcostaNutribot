@@ -40,9 +40,10 @@ class Settings(BaseSettings):
         "postgresql+asyncpg://postgres:postgres@localhost:5432/diet_agent"
     )
 
-    # OpenAI
+    # OpenAI / DeepSeek (OpenAI-compatible)
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
 
     # Telegram (legacy — only the feature flag remains)
     TELEGRAM_ENABLED: bool = True
