@@ -1,161 +1,218 @@
-import { FormEvent, useCallback, useEffect, useState } from "react"
-import { Link } from "react-router-dom"
-import { createPatient, getPatients } from "../services/api"
-import type { PaginatedPatients, Patient } from "../types"
+import { useCallback, useEffect, useState } from "react"
+import { MagnifyingGlass, Users, Plus } from "@phosphor-icons/react"
+import { PatientRow } from "../components/patients/PatientRow"
+import PatientDrawer from "../components/patients/PatientDrawer"
+import { SkeletonRow } from "../components/ui/Skeleton"
+import { EmptyState } from "../components/ui/EmptyState"
+import { getPatients, getPatientSummary } from "../services/api"
+import { useToast } from "../context/ToastContext"
+import type { PaginatedPatients, Patient, PatientSummary } from "../types"
+
+const STATUS_FILTERS = [
+  { value: "", label: "Todos" },
+  { value: "active_diet", label: "Con dieta activa" },
+  { value: "incomplete_profile", label: "Perfil pendiente" },
+  { value: "new_this_month", label: "Nuevos este mes" },
+] as const
 
 export default function Patients() {
+  const { addToast } = useToast()
+
   const [data, setData] = useState<PaginatedPatients | null>(null)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [creating, setCreating] = useState(false)
-  const [firstName, setFirstName] = useState("")
-  const [lastName, setLastName] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [summaries, setSummaries] = useState<Record<number, PatientSummary | null>>({})
+
+  // Debounced search: update debouncedSearch 300ms after the user stops typing
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [search])
 
   const load = useCallback(() => {
+    setLoading(true)
     setError(null)
-    getPatients({ search: search || undefined, page, page_size: 20 })
+    getPatients({
+      search: debouncedSearch || undefined,
+      status: statusFilter || undefined,
+      page,
+      page_size: 20,
+    })
       .then(setData)
       .catch((e) => setError(e instanceof Error ? e.message : "Error"))
-  }, [page, search])
+      .finally(() => setLoading(false))
+  }, [debouncedSearch, page, statusFilter])
 
   useEffect(() => {
     load()
   }, [load])
 
-  async function onSearch(e: FormEvent) {
-    e.preventDefault()
-    setPage(1)
-    setError(null)
-    try {
-      const d = await getPatients({
-        search: search || undefined,
-        page: 1,
-        page_size: 20,
+  // Fetch summaries whenever the patient list changes
+  useEffect(() => {
+    if (!data?.items.length) return
+    const ids = data.items.map((p) => p.id)
+    Promise.all(
+      ids.map((id) => getPatientSummary(id).catch(() => null)),
+    ).then((results) => {
+      const map: Record<number, PatientSummary | null> = {}
+      ids.forEach((id, i) => {
+        map[id] = results[i]
       })
-      setData(d)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error")
-    }
+      setSummaries(map)
+    })
+  }, [data?.items])
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setStatusFilter(e.target.value)
+    setPage(1)
   }
 
-  async function onCreate(e: FormEvent) {
-    e.preventDefault()
-    setError(null)
-    try {
-      await createPatient({ first_name: firstName, last_name: lastName })
-      setFirstName("")
-      setLastName("")
-      setCreating(false)
-      setPage(1)
-      load()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error")
-    }
+  const handleShare = (_patient: Patient) => {
+    addToast("Compartir: funcionalidad próximamente", "info")
   }
+
+  const handleCreated = () => {
+    addToast("Paciente creado exitosamente", "success")
+    setDrawerOpen(false)
+    setPage(1)
+    load()
+  }
+
+  const totalPages = data ? Math.ceil(data.total / data.page_size) : 0
 
   return (
-    <div>
-      <h1 style={{ marginTop: 0 }}>Patients</h1>
-      <form onSubmit={onSearch} style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        <input
-          placeholder="Search name"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{ padding: 8, minWidth: 200 }}
-        />
-        <button type="submit">Search</button>
+    <div className="px-4 py-6 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-slate-800">Pacientes</h1>
         <button
-          type="button"
-          onClick={() => setCreating((c) => !c)}
+          onClick={() => setDrawerOpen(true)}
+          className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 active:scale-[0.97] transition-all"
         >
-          {creating ? "Cancel" : "New patient"}
+          <Plus size={18} weight="bold" />
+          Nuevo Paciente
         </button>
-      </form>
+      </div>
 
-      {creating && (
-        <form
-          onSubmit={onCreate}
-          style={{
-            border: "1px solid #ddd",
-            padding: 16,
-            borderRadius: 8,
-            marginBottom: 24,
-            maxWidth: 400,
-          }}
+      {/* Search + Filters row */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="relative flex-1">
+          <MagnifyingGlass
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            size={18}
+          />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar pacientes..."
+            className="w-full pl-10 pr-4 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={handleStatusChange}
+          className="w-full sm:w-48 px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2394a3b8%22%3E%3Cpath%20d%3D%22M4.5%206l3.5%204%203.5-4%22%2F%3E%3C%2Fsvg%3E')] bg-[length:16px] bg-[right_12px_center] bg-no-repeat pr-9"
         >
-          <h2 style={{ fontSize: 16, marginTop: 0 }}>New patient</h2>
-          <label style={{ display: "block", fontSize: 13 }}>First name</label>
-          <input
-            required
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            style={{ width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }}
-          />
-          <label style={{ display: "block", fontSize: 13 }}>Last name</label>
-          <input
-            required
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            style={{ width: "100%", padding: 8, marginBottom: 8, boxSizing: "border-box" }}
-          />
-          <button type="submit">Create</button>
-        </form>
+          {STATUS_FILTERS.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Error state / no data */}
+      {error && !data && (
+        <div className="text-center py-16">
+          <p className="text-red-600 text-sm mb-4">{error}</p>
+          <button
+            onClick={load}
+            className="inline-flex items-center gap-2 rounded-full bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-100 transition-colors"
+          >
+            Reintentar
+          </button>
+        </div>
       )}
 
-      {error && <p style={{ color: "#b00020" }}>{error}</p>}
+      {/* Initial loading state */}
+      {loading && !data && (
+        <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonRow key={i} />
+          ))}
+        </div>
+      )}
 
-      {!data ? (
-        <p>Loading…</p>
-      ) : (
-        <>
-          <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: 900 }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-                <th style={{ padding: 8 }}>Name</th>
-                <th style={{ padding: 8 }}>City</th>
-                <th style={{ padding: 8 }}>Source</th>
-                <th style={{ padding: 8 }}>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.items.map((p: Patient) => (
-                <tr key={p.id} style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: 8 }}>
-                    <Link to={`/patients/${p.id}`}>
-                      {p.first_name} {p.last_name}
-                    </Link>
-                  </td>
-                  <td style={{ padding: 8 }}>{p.city || "—"}</td>
-                  <td style={{ padding: 8 }}>{p.source}</td>
-                  <td style={{ padding: 8 }}>
-                    {p.is_archived ? "archived" : p.is_active ? "active" : "inactive"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ marginTop: 16, display: "flex", gap: 12, alignItems: "center" }}>
+      {/* Empty state */}
+      {!loading && data?.items.length === 0 && (
+        <EmptyState
+          icon={<Users size={48} />}
+          title="Aún no hay pacientes"
+          description="Crea tu primer paciente para comenzar"
+          action={
             <button
-              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 active:scale-[0.97] transition-all"
+            >
+              <Plus size={18} weight="bold" />
+              Crear primer paciente
+            </button>
+          }
+        />
+      )}
+
+      {/* Patient list */}
+      {data && data.items.length > 0 && (
+        <>
+          <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+            {data.items.map((p) => (
+              <PatientRow
+                key={p.id}
+                patient={p}
+                summary={summaries[p.id]}
+                onShare={handleShare}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex items-center justify-center gap-4 mt-6">
+            <button
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              Previous
+              &larr; Anterior
             </button>
-            <span>
-              Page {page} · {data.total} total
+            <span className="text-sm text-slate-500">
+              P&aacute;gina {page} de {totalPages}
             </span>
             <button
-              type="button"
-              disabled={page * data.page_size >= data.total}
+              disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
+              className="inline-flex items-center gap-1 rounded-full px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              Next
+              Siguiente &rarr;
             </button>
           </div>
         </>
       )}
+
+      {/* Drawer */}
+      <PatientDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        onCreated={handleCreated}
+      />
     </div>
   )
 }
