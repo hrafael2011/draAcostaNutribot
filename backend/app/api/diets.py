@@ -101,6 +101,7 @@ async def generate_diet(
     body: DietGenerateRequest,
     db: AsyncSession = Depends(get_db),
     doctor: Doctor = Depends(get_current_doctor),
+    pending: bool = Query(False, description="Create as pending_approval instead of generated"),
 ):
     try:
         diet = await create_new_diet(
@@ -108,6 +109,7 @@ async def generate_diet(
             doctor,
             body.patient_id,
             body.doctor_instruction,
+            diet_status="pending_approval" if pending else "generated",
             duration_days=body.duration_days,
             meals_per_day=body.meals_per_day,
             strategy_mode=body.strategy_mode,
