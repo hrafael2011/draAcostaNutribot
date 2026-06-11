@@ -17,129 +17,8 @@ import {
   planDurationDaysFromPlanJson,
 } from "../utils/duration"
 import { buildDietStrategyBody } from "../utils/dietStrategyBody"
-import { mealSlotsSummaryEs, resolveMealSlots } from "../utils/planMeals"
 import type { DietStrategyMode, MealsPerDay } from "../types"
-
-function NutritionEnginePanel({ plan }: { plan: unknown }) {
-  if (!plan || typeof plan !== "object") return null
-  const p = plan as Record<string, unknown>
-  const ne = p.nutrition_engine
-  const macroGrams = p.macro_grams
-  const rules = p.clinical_rules_applied
-  const alerts = p.alerts
-  const hasNe = ne && typeof ne === "object" && Object.keys(ne as object).length > 0
-  const hasMg = Boolean(
-    macroGrams &&
-      typeof macroGrams === "object" &&
-      Object.values(macroGrams as Record<string, unknown>).some((v) => v != null),
-  )
-  const hasRules = Array.isArray(rules) && rules.length > 0
-  const hasAlerts = Array.isArray(alerts) && alerts.length > 0
-  const pdays = planDurationDaysFromPlanJson(p)
-  const hasDur = pdays != null
-  if (!hasNe && !hasMg && !hasRules && !hasAlerts && !hasDur) return null
-
-  const neObj = hasNe ? (ne as Record<string, unknown>) : null
-
-  return (
-    <div
-      style={{
-        marginBottom: 24,
-        padding: 16,
-        background: "#f8f6fef0",
-        border: "1px solid #e0d8cc",
-        borderRadius: 8,
-        lineHeight: 1.5,
-      }}
-    >
-      <h2 style={{ fontSize: 16, marginTop: 0 }}>Motor nutricional (sistema)</h2>
-      {hasDur && (
-        <p style={{ fontSize: 14, marginTop: 0 }}>
-          <strong>Duración total:</strong> {pdays} días (ciclo base en el plan: 7 días).
-        </p>
-      )}
-      {neObj && (
-        <ul style={{ margin: "8px 0", paddingLeft: 20, fontSize: 14 }}>
-          {neObj.engine_schema_version != null && (
-            <li>Esquema: {String(neObj.engine_schema_version)}</li>
-          )}
-          {neObj.bmr_kcal != null && <li>TMB estimada: {String(neObj.bmr_kcal)} kcal/día</li>}
-          {neObj.tdee_kcal != null && <li>GET (TDEE): {String(neObj.tdee_kcal)} kcal/día</li>}
-          {neObj.activity_factor != null && (
-            <li>Factor actividad: {String(neObj.activity_factor)}</li>
-          )}
-          {neObj.bmi != null && <li>IMC: {String(neObj.bmi)}</li>}
-          {neObj.goal_calories != null && (
-            <li>Objetivo calórico: {String(neObj.goal_calories)} kcal/día</li>
-          )}
-          {neObj.applied_mode != null && String(neObj.applied_mode) !== "auto" && (
-            <li>Modo de objetivos: {String(neObj.applied_mode)}</li>
-          )}
-          {neObj.manual_override_used === true && (
-            <li>Ajuste manual del profesional aplicado</li>
-          )}
-        </ul>
-      )}
-      {hasMg && (
-        <p style={{ fontSize: 14, margin: "8px 0" }}>
-          <strong>Gramos orientativos/día:</strong>{" "}
-          {[
-            (macroGrams as Record<string, unknown>).protein_g != null &&
-              `proteína ~${String((macroGrams as Record<string, unknown>).protein_g)} g`,
-            (macroGrams as Record<string, unknown>).carbs_g != null &&
-              `hidratos ~${String((macroGrams as Record<string, unknown>).carbs_g)} g`,
-            (macroGrams as Record<string, unknown>).fat_g != null &&
-              `grasas ~${String((macroGrams as Record<string, unknown>).fat_g)} g`,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-      )}
-      {hasRules && (
-        <p style={{ fontSize: 14, margin: "8px 0" }}>
-          <strong>Reglas clínicas aplicadas:</strong> {(rules as string[]).join(", ")}
-        </p>
-      )}
-      {hasAlerts && (
-        <div style={{ marginTop: 12 }}>
-          <strong style={{ fontSize: 14 }}>Avisos del sistema</strong>
-          <ul style={{ fontSize: 13, margin: "6px 0 0", paddingLeft: 20, color: "#5c4033" }}>
-            {(alerts as { severity?: string; message_es?: string }[]).map((a, i) => (
-              <li key={i}>
-                [{String(a.severity || "info").toUpperCase()}]{" "}
-                {a.message_es || JSON.stringify(a)}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function MealStructurePanel({ plan }: { plan: unknown }) {
-  const slots = resolveMealSlots(plan)
-  if (!slots.length) return null
-  return (
-    <div
-      style={{
-        marginBottom: 24,
-        padding: 16,
-        background: "#f8fbf4",
-        border: "1px solid #d8e4cb",
-        borderRadius: 8,
-      }}
-    >
-      <h2 style={{ fontSize: 16, marginTop: 0 }}>Estructura de comidas</h2>
-      <p style={{ margin: 0, fontSize: 14 }}>
-        <strong>Comidas por día:</strong> {slots.length}
-      </p>
-      <p style={{ margin: "6px 0 0", fontSize: 14 }}>
-        <strong>Estructura diaria:</strong> {mealSlotsSummaryEs(slots)}
-      </p>
-    </div>
-  )
-}
+import DietPreviewPanel from "../components/diet/DietPreviewPanel"
 
 export default function DietDetail() {
   const { dietId } = useParams()
@@ -302,8 +181,7 @@ export default function DietDetail() {
         </div>
       )}
 
-      <NutritionEnginePanel plan={diet.structured_plan_json} />
-      <MealStructurePanel plan={diet.structured_plan_json} />
+      <DietPreviewPanel diet={diet} />
 
       <form
         onSubmit={onRegenerate}
@@ -315,6 +193,11 @@ export default function DietDetail() {
         }}
       >
         <h2 style={{ fontSize: 16, marginTop: 0 }}>Regenerate (new version)</h2>
+        <p style={{ fontSize: 13, margin: "0 0 8px" }}>
+          <Link to={`/diets/${diet.id}/regenerate`} style={{ color: "#1a73e8" }}>
+            Open wizard →
+          </Link>
+        </p>
         <label style={{ fontSize: 13 }}>Total duration (days, multiple of 7; optional)</label>
         <DurationPresetButtons
           presets={durationPresets}
