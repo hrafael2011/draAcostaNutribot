@@ -16,7 +16,7 @@ from app.models import (
     PatientProfile,
     utcnow,
 )
-from app.schemas import IntakeLinkCreate, IntakeLinkOut, IntakeLinkPublicMeta, IntakePublicSubmit
+from app.schemas import IntakeLinkCreate, IntakeLinkOut, IntakeLinkPublicMeta, IntakePublicSubmit, IntakeUpdateSubmit
 
 router = APIRouter()
 
@@ -212,6 +212,107 @@ async def public_submit(
         AuditLog(
             doctor_id=link.doctor_id,
             action="intake_submit",
+            entity_type="patient",
+            entity_id=patient.id,
+            payload_json={"intake_link_id": link.id},
+        )
+    )
+    await db.commit()
+    return {"ok": True}
+
+
+@router.put("/public/{token}/update", status_code=status.HTTP_200_OK)
+async def public_update(
+    token: str,
+    body: IntakeUpdateSubmit,
+    db: AsyncSession = Depends(get_db),
+):
+    """Actualizar datos de un paciente existente mediante link de actualización."""
+    result = await db.execute(
+        select(PatientIntakeLink).where(PatientIntakeLink.token == token)
+    )
+    link = result.scalar_one_or_none()
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid link")
+    now = utcnow()
+    if link.status == "revoked":
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link revoked")
+    if link.expires_at < now:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link expired")
+    if link.use_count >= link.max_uses:
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link already used")
+    if link.patient_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This link is for new patient registration, use POST /submit",
+        )
+
+    patient = await db.get(Patient, link.patient_id)
+    if patient is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
+
+    # Update patient base fields only if provided
+    patient_fields = [
+        "first_name", "last_name", "birth_date", "sex", "whatsapp", "email",
+        "country", "city",
+    ]
+    for field_name in patient_fields:
+        value = getattr(body, field_name, None)
+        if value is not None:
+            setattr(patient, field_name, value)
+    patient.updated_at = utcnow()
+
+    # Update profile fields only if provided
+    profile_fields = [
+        "objective", "diseases", "medications", "food_allergies", "foods_avoided",
+        "dietary_style", "food_preferences", "disliked_foods", "water_intake_liters",
+        "activity_level", "stress_level", "sleep_quality", "sleep_hours",
+        "budget_level", "adherence_level", "exercise_frequency_per_week",
+        "exercise_type", "extra_notes",
+    ]
+    has_profile_update = any(getattr(body, f, None) is not None for f in profile_fields)
+    if has_profile_update:
+        pr_result = await db.execute(
+            select(PatientProfile).where(PatientProfile.patient_id == patient.id)
+        )
+        profile = pr_result.scalar_one_or_none()
+        if profile is None:
+            profile = PatientProfile(patient_id=patient.id)
+            db.add(profile)
+        for field_name in profile_fields:
+            value = getattr(body, field_name, None)
+            if value is not None:
+                setattr(profile, field_name, value)
+        profile.updated_at = utcnow()
+
+    # Add metric entry only if any measurement provided
+    metric_fields = [
+        "weight_kg", "height_cm", "neck_cm", "chest_cm", "waist_cm",
+        "hip_cm", "leg_cm", "calf_cm",
+    ]
+    has_metric = any(getattr(body, f, None) is not None for f in metric_fields)
+    if has_metric:
+        metric = PatientMetrics(
+            patient_id=patient.id,
+            recorded_at=utcnow(),
+            source="intake_update",
+        )
+        for field_name in metric_fields:
+            value = getattr(body, field_name, None)
+            if value is not None:
+                setattr(metric, field_name, value)
+        db.add(metric)
+
+    link.use_count += 1
+    link.last_used_at = utcnow()
+    link.updated_at = utcnow()
+    if link.use_count >= link.max_uses:
+        link.status = "completed"
+
+    db.add(
+        AuditLog(
+            doctor_id=link.doctor_id,
+            action="intake_update",
             entity_type="patient",
             entity_id=patient.id,
             payload_json={"intake_link_id": link.id},

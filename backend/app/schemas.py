@@ -296,6 +296,44 @@ class IntakePublicSubmit(BaseModel):
     calf_cm: Optional[float] = None
 
 
+class IntakeUpdateSubmit(BaseModel):
+    """Campos opcionales para actualización de paciente existente vía link."""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    birth_date: Optional[date] = None
+    sex: Optional[str] = None
+    whatsapp: Optional[str] = None
+    email: Optional[EmailStr] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    objective: Optional[str] = None
+    diseases: Optional[str] = None
+    medications: Optional[str] = None
+    food_allergies: Optional[str] = None
+    foods_avoided: Optional[str] = None
+    dietary_style: Optional[str] = None
+    food_preferences: Optional[str] = None
+    disliked_foods: Optional[str] = None
+    water_intake_liters: Optional[float] = None
+    activity_level: Optional[str] = None
+    stress_level: Optional[int] = None
+    sleep_quality: Optional[int] = None
+    sleep_hours: Optional[float] = None
+    budget_level: Optional[str] = None
+    adherence_level: Optional[int] = None
+    exercise_frequency_per_week: Optional[int] = None
+    exercise_type: Optional[str] = None
+    extra_notes: Optional[str] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    neck_cm: Optional[float] = None
+    chest_cm: Optional[float] = None
+    waist_cm: Optional[float] = None
+    hip_cm: Optional[float] = None
+    leg_cm: Optional[float] = None
+    calf_cm: Optional[float] = None
+
+
 class DietGenerateRequest(BaseModel):
     patient_id: int
     doctor_instruction: Optional[str] = None
