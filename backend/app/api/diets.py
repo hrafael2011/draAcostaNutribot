@@ -11,7 +11,9 @@ from app.logic.diet_duration import QUICK_PLAN_DURATION_DAYS
 from app.models import Diet, DietVersion, Doctor, Patient, PatientMetrics, PatientProfile
 from app.schemas import (
     DietGenerateRequest,
+    DietMealsUpdateRequest,
     DietOut,
+    DietQuickAdjustRequest,
     DietRegenerateRequest,
     DietVersionSummary,
     PaginatedDiets,
@@ -22,7 +24,14 @@ from app.services.diet_export import (
     build_diet_export_pdf_bytes,
     build_diet_export_text,
 )
-from app.services.diet_service import DietGenerationError, create_new_diet, regenerate_diet
+from app.services.diet_service import (
+    DietGenerationError,
+    approve_diet_preview,
+    create_new_diet,
+    discard_diet_preview,
+    regenerate_diet,
+    update_diet_meals,
+)
 
 
 router = APIRouter()
@@ -172,6 +181,86 @@ async def regenerate_diet_route(
             if body.manual_targets
             else None,
         )
+        await db.commit()
+        await db.refresh(diet)
+        return diet
+    except DietGenerationError as e:
+        await db.rollback()
+        raise _http_from_diet_error(e) from e
+
+
+@router.post("/{diet_id}/approve", response_model=DietOut)
+async def approve_diet(
+    diet_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    """Approve a pending diet, changing status from pending_approval to generated."""
+    try:
+        diet = await approve_diet_preview(db, doctor, diet_id)
+        await db.commit()
+        await db.refresh(diet)
+        return diet
+    except DietGenerationError as e:
+        await db.rollback()
+        raise _http_from_diet_error(e) from e
+
+
+@router.post("/{diet_id}/discard", response_model=DietOut)
+async def discard_diet(
+    diet_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    """Discard a pending diet, changing status from pending_approval to discarded."""
+    try:
+        diet = await discard_diet_preview(db, doctor, diet_id)
+        await db.commit()
+        await db.refresh(diet)
+        return diet
+    except DietGenerationError as e:
+        await db.rollback()
+        raise _http_from_diet_error(e) from e
+
+
+@router.post("/{diet_id}/quick-adjust", response_model=DietOut)
+async def quick_adjust_diet(
+    diet_id: int,
+    body: DietQuickAdjustRequest,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    """Regenerate diet with a quick-adjust instruction, keeping it as pending_approval."""
+    try:
+        diet = await regenerate_diet(
+            db,
+            doctor,
+            diet_id,
+            body.adjustment,
+            diet_status="pending_approval",
+        )
+        await db.commit()
+        await db.refresh(diet)
+        return diet
+    except DietGenerationError as e:
+        await db.rollback()
+        raise _http_from_diet_error(e) from e
+
+
+@router.patch("/{diet_id}/meals", response_model=DietOut)
+async def edit_diet_meals(
+    diet_id: int,
+    body: DietMealsUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    """Edit specific meals in a pending-approval diet."""
+    try:
+        meals_dicts = [
+            {"day_index": m.day_index, "slot_key": m.slot_key, "meal_text": m.meal_text}
+            for m in body.meals
+        ]
+        diet = await update_diet_meals(db, doctor, diet_id, meals_dicts)
         await db.commit()
         await db.refresh(diet)
         return diet
