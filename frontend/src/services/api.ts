@@ -423,3 +423,32 @@ export async function downloadDietExport(id: number, format: "txt" | "json") {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+export function approveDiet(dietId: number) {
+  return authFetch(`/diets/${dietId}/approve`, { method: "POST" }).then((r) =>
+    parseJson<Diet>(r),
+  )
+}
+
+export function discardDiet(dietId: number) {
+  return authFetch(`/diets/${dietId}/discard`, { method: "POST" }).then((r) =>
+    parseJson<Diet>(r),
+  )
+}
+
+export function quickAdjustDiet(dietId: number, adjustment: string) {
+  return authFetch(`/diets/${dietId}/quick-adjust`, {
+    method: "POST",
+    body: JSON.stringify({ adjustment }),
+  }).then((r) => parseJson<Diet>(r))
+}
+
+export function updateDietMeals(
+  dietId: number,
+  body: { meals: { day_index: number; slot_key: string; meal_text: string }[] },
+) {
+  return authFetch(`/diets/${dietId}/meals`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  }).then((r) => parseJson<Diet>(r))
+}
