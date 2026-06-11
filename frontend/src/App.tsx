@@ -33,7 +33,8 @@ export default function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="patients" element={<Patients />} />
         <Route path="patients/:patientId" element={<PatientDetail />} />
-        <Route path="intake-links" element={<IntakeLinks />} />
+        <Route path="intake-links" element={<Navigate to="/formularios" replace />} />
+        <Route path="formularios" element={<IntakeLinks />} />
         <Route path="diets/new" element={<DietWizard />} />
         <Route path="diets/:dietId/regenerate" element={<DietWizard />} />
         <Route path="diets" element={<Diets />} />
