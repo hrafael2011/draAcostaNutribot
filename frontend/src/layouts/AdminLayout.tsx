@@ -1,93 +1,154 @@
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 import { Outlet, NavLink, useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { getDoctorMe } from "../services/api"
-import type { DoctorOut } from "../types"
 
-const navItems = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/patients", label: "Patients" },
-  { to: "/intake-links", label: "Intake Links" },
-  { to: "/diets", label: "Diets" },
-  { to: "/telegram", label: "Telegram" },
-]
+type DoctorMe = { full_name: string; email: string; role: string }
 
 export default function AdminLayout() {
-  const { logout, session } = useAuth()
+  const [doctor, setDoctor] = useState<DoctorMe | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { logout } = useAuth()
   const navigate = useNavigate()
-  const [me, setMe] = useState<DoctorOut | null>(null)
 
   useEffect(() => {
     let cancelled = false
     getDoctorMe()
       .then((d) => {
-        if (!cancelled) setMe(d as DoctorOut)
+        if (!cancelled)
+          setDoctor({ full_name: d.full_name, email: d.email, role: d.role })
       })
-      .catch((e) => {
+      .catch(() => {
         if (cancelled) return
-        if (e instanceof Error && e.message === "UNAUTHORIZED") {
-          logout()
-          navigate("/login", { replace: true })
-          return
-        }
-        setMe(null)
+        logout()
+        navigate("/login", { replace: true })
       })
     return () => {
       cancelled = true
     }
   }, [logout, navigate])
 
-  const visibleNavItems =
-    (me?.role || session?.role) === "admin"
-      ? [...navItems, { to: "/admin/users", label: "Usuarios" }]
-      : navItems
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    `flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+      isActive
+        ? "bg-emerald-100 text-emerald-700"
+        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+    }`
+
+  const navItems = [
+    { to: "/dashboard", label: "Dashboard", icon: "📊" },
+    { to: "/patients", label: "Pacientes", icon: "👥" },
+    { to: "/diets", label: "Dietas", icon: "🍽️" },
+    { to: "/intake-links", label: "Links", icon: "🔗" },
+    { to: "/telegram", label: "Telegram", icon: "📱" },
+  ]
+
+  if (doctor?.role === "admin") {
+    navItems.push({ to: "/admin/users", label: "Usuarios", icon: "⚙️" })
+  }
+
+  const SidebarContent = () => (
+    <div className="flex h-full flex-col">
+      {/* Logo + Doctor info */}
+      <div className="flex items-center gap-3 border-b border-gray-200 px-4 py-4">
+        <img
+          src="/logo-sidebar.webp"
+          alt="Logo"
+          width={48}
+          height={46}
+          className="rounded-lg shadow-sm"
+        />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-gray-800">
+            {doctor?.full_name || "Doctora"}
+          </p>
+          <p className="truncate text-xs text-gray-500">{doctor?.email}</p>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 space-y-1 px-2 py-4">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === "/dashboard"}
+            className={linkClass}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span>{item.icon}</span>
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Logout */}
+      <div className="border-t border-gray-200 px-2 py-3">
+        <button
+          type="button"
+          onClick={() => {
+            logout()
+            navigate("/login", { replace: true })
+          }}
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-gray-500 hover:bg-red-50 hover:text-red-600 transition-colors"
+        >
+          🚪 Cerrar sesion
+        </button>
+      </div>
+    </div>
+  )
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "system-ui, sans-serif" }}>
-      <aside style={{ width: 240, padding: 24, borderRight: "1px solid #ddd" }}>
-        <div style={{ fontWeight: 700, marginBottom: 16 }}>Diet Admin</div>
-        <nav style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {visibleNavItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              style={({ isActive }) => ({
-                textDecoration: "none",
-                color: isActive ? "#111" : "#555",
-                fontWeight: isActive ? 700 : 400,
-              })}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex md:w-60 md:flex-col md:bg-white md:border-r md:border-gray-200 md:fixed md:inset-y-0">
+        <SidebarContent />
       </aside>
-      <main style={{ flex: 1, padding: 32, display: "flex", flexDirection: "column" }}>
-        <header
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            gap: 16,
-            marginBottom: 16,
-          }}
-        >
-          <span style={{ color: "#555", fontSize: 14 }}>
-            {me ? `${me.full_name} · ${me.email}` : ""}
-          </span>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div
+            className="fixed inset-0 bg-black/50"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <aside className="fixed inset-y-0 left-0 w-72 bg-white shadow-xl z-50">
+            <SidebarContent />
+          </aside>
+        </div>
+      )}
+
+      {/* Main content */}
+      <div className="flex flex-1 flex-col md:ml-60">
+        {/* Top bar (mobile) */}
+        <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-gray-200 bg-white px-4 py-2 md:hidden">
           <button
             type="button"
-            onClick={() => {
-              logout()
-              navigate("/login", { replace: true })
-            }}
-            style={{ padding: "6px 12px" }}
+            onClick={() => setSidebarOpen(true)}
+            className="rounded-lg p-1 text-gray-500 hover:bg-gray-100"
+            aria-label="Abrir menu"
           >
-            Log out
+            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
           </button>
+          <img
+            src="/logo-mobile.webp"
+            alt="Logo"
+            width={32}
+            height={31}
+            className="rounded-md"
+          />
+          <p className="text-sm font-semibold text-gray-800 truncate">
+            {doctor?.full_name || "Nutribot"}
+          </p>
         </header>
-        <Outlet />
-      </main>
+
+        {/* Page content */}
+        <main className="flex-1 p-4 md:p-6">
+          <Outlet />
+        </main>
+      </div>
     </div>
   )
 }
