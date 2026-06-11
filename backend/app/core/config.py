@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str | None = None
     TELEGRAM_BOT_USERNAME: str = ""
     TELEGRAM_WEBHOOK_SECRET: str | None = None
+    TELEGRAM_ENABLED: bool = True
 
     @property
     def is_production(self) -> bool:
@@ -67,7 +68,7 @@ class Settings(BaseSettings):
         )
         if self.is_production and self.JWT_SECRET == "change-me":
             raise ValueError("JWT_SECRET must be configured in production")
-        if self.is_production and not self.TELEGRAM_WEBHOOK_SECRET:
+        if self.is_production and self.TELEGRAM_ENABLED and not self.TELEGRAM_WEBHOOK_SECRET:
             raise ValueError(
                 "TELEGRAM_WEBHOOK_SECRET must be configured in production"
             )

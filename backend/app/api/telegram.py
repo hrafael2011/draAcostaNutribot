@@ -152,6 +152,9 @@ async def telegram_webhook(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
+    if not settings.TELEGRAM_ENABLED:
+        return {"ok": True}
+
     expected = settings.TELEGRAM_WEBHOOK_SECRET
     if expected:
         got = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
