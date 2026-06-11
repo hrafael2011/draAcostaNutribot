@@ -178,3 +178,87 @@ export type PaginatedDiets = {
   page: number
   page_size: number
 }
+
+// --- Wizard types ---
+
+export type WizardStep =
+  | "patient"
+  | "note"
+  | "duration"
+  | "meals"
+  | "strategy"
+  | "guided_style"
+  | "guided_macros"
+  | "manual_targets"
+  | "confirm"
+  | "preview"
+
+export const WIZARD_STEPS: { key: WizardStep; label: string }[] = [
+  { key: "patient", label: "Paciente" },
+  { key: "note", label: "Nota" },
+  { key: "duration", label: "Duración" },
+  { key: "meals", label: "Comidas" },
+  { key: "strategy", label: "Modo" },
+  { key: "confirm", label: "Confirmar" },
+  { key: "preview", label: "Revisar" },
+]
+
+export type WizardState = {
+  patientId: number | null
+  patientName: string
+  doctorInstruction: string
+  durationDays: number
+  mealsPerDay: MealsPerDay
+  strategyMode: DietStrategyMode
+  dietStyle: string
+  macroProtein: string
+  macroCarbs: string
+  macroFat: string
+  manualKcal: string
+  manualProteinG: string
+  manualCarbsG: string
+  manualFatG: string
+  generatedDiet: Diet | null
+  isRegeneration: boolean
+  parentDietId: number | null
+}
+
+export type WizardAction =
+  | { type: "SET_FIELD"; field: string; value: unknown }
+  | { type: "SET_DIET"; diet: Diet }
+  | { type: "RESET" }
+
+export function wizardReducer(state: WizardState, action: WizardAction): WizardState {
+  if (action.type === "SET_FIELD") {
+    return { ...state, [action.field]: action.value }
+  }
+  if (action.type === "SET_DIET") {
+    return { ...state, generatedDiet: action.diet }
+  }
+  if (action.type === "RESET") {
+    return { ...initialWizardState() }
+  }
+  return state
+}
+
+export function initialWizardState(patientId?: number): WizardState {
+  return {
+    patientId: patientId ?? null,
+    patientName: "",
+    doctorInstruction: "",
+    durationDays: 7,
+    mealsPerDay: 4,
+    strategyMode: "auto",
+    dietStyle: "",
+    macroProtein: "",
+    macroCarbs: "",
+    macroFat: "",
+    manualKcal: "",
+    manualProteinG: "",
+    manualCarbsG: "",
+    manualFatG: "",
+    generatedDiet: null,
+    isRegeneration: false,
+    parentDietId: null,
+  }
+}
