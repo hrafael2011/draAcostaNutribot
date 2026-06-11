@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from sqlalchemy import (
-    BigInteger,
     Column,
     Integer,
     String,
@@ -28,8 +27,6 @@ class Doctor(Base):
     email = Column(String(190), unique=True, index=True, nullable=False)
     phone = Column(String(30), nullable=True)
     hashed_password = Column(String(255), nullable=False)
-    telegram_user_id = Column(String(40), unique=True, nullable=True)
-    telegram_username = Column(String(120), nullable=True)
     role = Column(String(20), default="doctor", nullable=False)
     must_change_password = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -41,46 +38,6 @@ class Doctor(Base):
         "PatientIntakeLink", back_populates="doctor", cascade="all, delete"
     )
     diets = relationship("Diet", back_populates="doctor", cascade="all, delete")
-    bindings = relationship(
-        "DoctorTelegramBinding", back_populates="doctor", cascade="all, delete"
-    )
-
-
-class TelegramPendingLink(Base):
-    __tablename__ = "telegram_pending_links"
-
-    id = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(
-        Integer, ForeignKey("doctors.id"), nullable=False, unique=True, index=True
-    )
-    code = Column(String(32), unique=True, nullable=False, index=True)
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-
-
-class TelegramProcessedUpdate(Base):
-    """Telegram webhook delivery idempotency (one row per update_id)."""
-
-    __tablename__ = "telegram_processed_updates"
-
-    id = Column(Integer, primary_key=True, index=True)
-    update_id = Column(BigInteger, unique=True, nullable=False, index=True)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-
-
-class DoctorTelegramBinding(Base):
-    __tablename__ = "doctor_telegram_bindings"
-
-    id = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
-    telegram_user_id = Column(String(40), unique=True, nullable=False)
-    telegram_chat_id = Column(String(40), unique=True, nullable=False)
-    telegram_username = Column(String(120), nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
-
-    doctor = relationship("Doctor", back_populates="bindings")
 
 
 class Patient(Base):
@@ -221,16 +178,6 @@ class DietVersion(Base):
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     diet = relationship("Diet", back_populates="versions")
-
-
-class ConversationState(Base):
-    __tablename__ = "conversation_states"
-
-    id = Column(Integer, primary_key=True, index=True)
-    doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
-    channel_user_key = Column(String(80), nullable=False)
-    context_data = Column(JSON, nullable=False, default=dict)
-    updated_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
 
 class AuditLog(Base):

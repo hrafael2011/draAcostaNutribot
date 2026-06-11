@@ -47,8 +47,6 @@ class DoctorOut(BaseModel):
     full_name: str
     email: EmailStr
     phone: Optional[str] = None
-    telegram_user_id: Optional[str] = None
-    telegram_username: Optional[str] = None
     role: str = "doctor"
     must_change_password: bool = False
     is_active: bool
@@ -385,19 +383,6 @@ class DietRegenerateRequest(BaseModel):
         from app.logic.diet_duration import validate_duration_days as vd
 
         return vd(v)
-
-
-class TelegramBindingOut(BaseModel):
-    linked: bool
-    telegram_user_id: Optional[str] = None
-    telegram_username: Optional[str] = None
-    bot_username: Optional[str] = None
-
-
-class TelegramBindStartOut(BaseModel):
-    deep_link: str
-    code: str
-    expires_at: datetime
 
 
 class DietOut(BaseModel):

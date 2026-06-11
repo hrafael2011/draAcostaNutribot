@@ -44,10 +44,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
 
-    # Telegram
-    TELEGRAM_BOT_TOKEN: str | None = None
-    TELEGRAM_BOT_USERNAME: str = ""
-    TELEGRAM_WEBHOOK_SECRET: str | None = None
+    # Telegram (legacy — only the feature flag remains)
     TELEGRAM_ENABLED: bool = True
 
     @property
@@ -59,19 +56,8 @@ class Settings(BaseSettings):
         self.ENV = (self.ENV or "development").strip().lower()
         self.CORS_ORIGINS = (self.CORS_ORIGINS or "*").strip() or "*"
         self.DATABASE_URL = normalize_async_database_url(self.DATABASE_URL)
-        self.TELEGRAM_BOT_USERNAME = (self.TELEGRAM_BOT_USERNAME or "").strip()
-        self.TELEGRAM_WEBHOOK_SECRET = (
-            self.TELEGRAM_WEBHOOK_SECRET.strip()
-            if isinstance(self.TELEGRAM_WEBHOOK_SECRET, str)
-            and self.TELEGRAM_WEBHOOK_SECRET.strip()
-            else None
-        )
         if self.is_production and self.JWT_SECRET == "change-me":
             raise ValueError("JWT_SECRET must be configured in production")
-        if self.is_production and self.TELEGRAM_ENABLED and not self.TELEGRAM_WEBHOOK_SECRET:
-            raise ValueError(
-                "TELEGRAM_WEBHOOK_SECRET must be configured in production"
-            )
         return self
 
 
