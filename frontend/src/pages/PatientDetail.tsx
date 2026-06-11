@@ -9,24 +9,9 @@ import {
   patchPatient,
   patchProfile,
 } from "../services/api"
+import { SkeletonCard } from "../components/ui/Skeleton"
+import { useToast } from "../context/ToastContext"
 import type { Patient, PatientMetric, PatientProfile, PatientSummary } from "../types"
-
-type Tab = "summary" | "data" | "profile" | "metrics"
-
-const inputStyle = {
-  width: "100%",
-  padding: 8,
-  marginBottom: 8,
-  boxSizing: "border-box" as const,
-}
-
-const selectStyle = {
-  ...inputStyle,
-  background: "#fff",
-  border: "1px solid #ccc",
-  borderRadius: 4,
-  height: 36,
-}
 
 // ── Opciones predefinidas ───────────────────────────────────────────────────
 
@@ -78,7 +63,13 @@ const FOODS_AVOIDED_OPTIONS = [
   "Frituras",
 ]
 
-// ── Helpers multi-selección ─────────────────────────────────────────────────
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+const INPUT_CLASSES =
+  "w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
+
+const SELECT_CLASSES =
+  "w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors"
 
 function parseMultiValue(
   raw: string | null | undefined,
@@ -98,6 +89,110 @@ function buildMultiValue(pills: string[], otherText: string): string | null {
   const all = [...pills]
   if (otherText.trim()) all.push(otherText.trim())
   return all.length > 0 ? all.join(", ") : null
+}
+
+function calculateAge(birthDate?: string | null): number | null {
+  if (!birthDate) return null
+  const birth = new Date(birthDate)
+  const today = new Date()
+  let age = today.getFullYear() - birth.getFullYear()
+  const m = today.getMonth() - birth.getMonth()
+  if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--
+  return age
+}
+
+function bmiClassification(bmi: number): string {
+  if (bmi < 18.5) return "Bajo peso"
+  if (bmi < 25) return "Normal"
+  if (bmi < 30) return "Sobrepeso"
+  return "Obesidad"
+}
+
+function calcIMC(
+  weight: number | null | undefined,
+  height: number | null | undefined
+): number | null {
+  if (weight == null || height == null || height === 0) return null
+  return Math.round((weight / ((height / 100) ** 2)) * 10) / 10
+}
+
+function getInitials(firstName?: string | null, lastName?: string | null): string {
+  const f = firstName?.charAt(0) ?? ""
+  const l = lastName?.charAt(0) ?? ""
+  return (f + l).toUpperCase() || "?"
+}
+
+function timeAgo(dateStr?: string | null): string {
+  if (!dateStr) return ""
+  const now = new Date()
+  const date = new Date(dateStr)
+  const diffMs = now.getTime() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  if (diffMins < 1) return "recién"
+  if (diffMins < 60) return `hace ${diffMins} min`
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `hace ${diffHours}h`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays === 1) return "hace 1 día"
+  if (diffDays < 30) return `hace ${diffDays} días`
+  const diffMonths = Math.floor(diffDays / 30)
+  if (diffMonths === 1) return "hace 1 mes"
+  if (diffMonths < 12) return `hace ${diffMonths} meses`
+  const years = Math.floor(diffMonths / 12)
+  return `hace ${years} años`
+}
+
+function formatDate(dateStr?: string | null): string {
+  if (!dateStr) return ""
+  const d = new Date(dateStr)
+  return d.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  })
+}
+
+// ── WeightSparkline ─────────────────────────────────────────────────────────
+
+function WeightSparkline({ metrics }: { metrics: PatientMetric[] }) {
+  const weightData = metrics
+    .filter((m) => m.weight_kg != null)
+    .slice(-30)
+    .map((m) => m.weight_kg as number)
+
+  if (weightData.length < 2) return null
+
+  const w = 200
+  const h = 48
+  const min = Math.min(...weightData)
+  const max = Math.max(...weightData)
+  const range = max - min || 1
+  const padding = 3
+
+  const points = weightData
+    .map((val, i) => {
+      const x = (i / (weightData.length - 1)) * w
+      const y = h - ((val - min) / range) * (h - padding * 2) - padding
+      return `${x},${y}`
+    })
+    .join(" ")
+
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className="w-full h-12"
+      preserveAspectRatio="none"
+    >
+      <polyline
+        fill="none"
+        stroke="#059669"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        points={points}
+      />
+    </svg>
+  )
 }
 
 // ── Componente PillSelect ───────────────────────────────────────────────────
@@ -142,9 +237,13 @@ function PillSelect({
     }
   }
 
+  const pillBase = "px-3 py-1 rounded-full text-sm font-medium cursor-pointer transition-all select-none"
+  const pillActive = "bg-emerald-600 text-white shadow-sm"
+  const pillInactive = "bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+
   return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+    <div className="mb-2">
+      <div className="flex flex-wrap gap-1.5">
         {options.map((opt) => {
           const active = selected.includes(opt)
           return (
@@ -152,16 +251,7 @@ function PillSelect({
               key={opt}
               type="button"
               onClick={() => toggle(opt)}
-              style={{
-                padding: "4px 12px",
-                borderRadius: 16,
-                border: `1px solid ${active ? "#1e3a5f" : "#ccc"}`,
-                background: active ? "#1e3a5f" : "#fff",
-                color: active ? "#fff" : "#333",
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: active ? 600 : 400,
-              }}
+              className={`${pillBase} ${active ? pillActive : pillInactive}`}
             >
               {opt}
             </button>
@@ -171,15 +261,7 @@ function PillSelect({
           <button
             type="button"
             onClick={toggleOther}
-            style={{
-              padding: "4px 12px",
-              borderRadius: 16,
-              border: `1px solid ${showOther ? "#1e3a5f" : "#ccc"}`,
-              background: showOther ? "#1e3a5f" : "#fff",
-              color: showOther ? "#fff" : "#333",
-              cursor: "pointer",
-              fontSize: 13,
-            }}
+            className={`${pillBase} ${showOther ? pillActive : pillInactive}`}
           >
             Otro
           </button>
@@ -191,7 +273,7 @@ function PillSelect({
           value={otherText}
           onChange={(e) => onOtherChange(e.target.value)}
           placeholder="Especificar..."
-          style={{ ...inputStyle, marginTop: 6, width: "100%" }}
+          className={`${INPUT_CLASSES} mt-2`}
         />
       )}
     </div>
@@ -203,17 +285,27 @@ function PillSelect({
 export default function PatientDetail() {
   const { patientId: idParam } = useParams()
   const patientId = Number(idParam)
-  const [tab, setTab] = useState<Tab>("summary")
+  const { addToast } = useToast()
+
   const [patient, setPatient] = useState<Patient | null>(null)
   const [summary, setSummary] = useState<PatientSummary | null>(null)
   const [profile, setProfile] = useState<PatientProfile | null>(null)
   const [metrics, setMetrics] = useState<PatientMetric[]>([])
   const [error, setError] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
 
+  // Metric form
   const [mWeight, setMWeight] = useState("")
   const [mHeight, setMHeight] = useState("")
   const [mNotes, setMNotes] = useState("")
+
+  // Inline edit booleans
+  const [editingData, setEditingData] = useState(false)
+  const [editingProfile, setEditingProfile] = useState(false)
+  const [showMetricForm, setShowMetricForm] = useState(false)
+
+  // Form keys to force re-mount with fresh defaults
+  const [dataFormKey, setDataFormKey] = useState(0)
+  const [profileFormKey, setProfileFormKey] = useState(0)
 
   // ── Estado multi-selección del perfil clínico ───────────────────────────
   const [diseasesPills, setDiseasesPills] = useState<string[]>([])
@@ -247,6 +339,39 @@ export default function PatientDetail() {
     setFoodsAvoidedOther(fao)
   }, [profile])
 
+  // ── Carga inicial de datos ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!patientId || Number.isNaN(patientId)) return
+    let cancelled = false
+    setError(null)
+    setPatient(null)
+    setProfile(null)
+    setSummary(null)
+    setMetrics([])
+
+    Promise.all([
+      getPatient(patientId),
+      getProfile(patientId).catch(() => null),
+      getPatientSummary(patientId).catch(() => null),
+      getMetrics(patientId).catch(() => [] as PatientMetric[]),
+    ])
+      .then(([p, pr, s, m]) => {
+        if (cancelled) return
+        setPatient(p)
+        if (pr) setProfile(pr as PatientProfile)
+        if (s) setSummary(s as PatientSummary)
+        setMetrics(m as PatientMetric[])
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Error")
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [patientId])
+
+  // ── Refresh helpers ────────────────────────────────────────────────────
   const refreshSummary = useCallback(async () => {
     try {
       const s = await getPatientSummary(patientId)
@@ -266,35 +391,11 @@ export default function PatientDetail() {
     setMetrics(m)
   }, [patientId])
 
-  useEffect(() => {
-    if (!patientId || Number.isNaN(patientId)) return
-    let cancelled = false
-    setError(null)
-    Promise.all([getPatient(patientId), getProfile(patientId)])
-      .then(([p, pr]) => {
-        if (cancelled) return
-        setPatient(p)
-        setProfile(pr)
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Error")
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [patientId])
-
-  useEffect(() => {
-    if (!patientId || Number.isNaN(patientId)) return
-    if (tab === "summary") refreshSummary().catch(() => setSummary(null))
-    if (tab === "metrics") refreshMetrics().catch(() => setMetrics([]))
-    if (tab === "profile") refreshProfile().catch(() => setProfile(null))
-  }, [tab, patientId, refreshSummary, refreshMetrics, refreshProfile])
+  // ── Handlers ───────────────────────────────────────────────────────────
 
   async function onSaveData(e: FormEvent) {
     e.preventDefault()
     if (!patient) return
-    setMsg(null)
     setError(null)
     try {
       const form = e.target as HTMLFormElement
@@ -313,15 +414,16 @@ export default function PatientDetail() {
       }
       const p = await patchPatient(patientId, body)
       setPatient(p)
-      setMsg("Datos guardados")
+      setEditingData(false)
+      addToast("Datos guardados", "success")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error")
+      addToast(err instanceof Error ? err.message : "Error al guardar", "error")
     }
   }
 
   async function onSaveProfile(e: FormEvent) {
     e.preventDefault()
-    setMsg(null)
     setError(null)
     try {
       const form = e.target as HTMLFormElement
@@ -334,7 +436,6 @@ export default function PatientDetail() {
       }
       const body: Record<string, unknown> = {
         objective: (fd.get("objective") as string) || null,
-        // Multi-selección: leídos desde estado
         diseases: buildMultiValue(diseasesPills, diseasesOther),
         medications: (fd.get("medications") as string) || null,
         food_allergies: buildMultiValue(allergiesPills, allergiesOther),
@@ -356,15 +457,16 @@ export default function PatientDetail() {
       }
       const pr = await patchProfile(patientId, body)
       setProfile(pr)
-      setMsg("Perfil guardado")
+      setEditingProfile(false)
+      addToast("Perfil guardado", "success")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error")
+      addToast(err instanceof Error ? err.message : "Error al guardar", "error")
     }
   }
 
   async function onAddMetric(e: FormEvent) {
     e.preventDefault()
-    setMsg(null)
     setError(null)
     try {
       await addMetric(patientId, {
@@ -376,404 +478,1067 @@ export default function PatientDetail() {
       setMWeight("")
       setMHeight("")
       setMNotes("")
+      setShowMetricForm(false)
       await refreshMetrics()
-      setMsg("Medición registrada")
+      addToast("Medición registrada", "success")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error")
+      addToast(err instanceof Error ? err.message : "Error al registrar", "error")
     }
   }
 
-  const tabBtn = (t: Tab, label: string) => (
-    <button
-      type="button"
-      onClick={() => {
-        setTab(t)
-        setMsg(null)
-        setError(null)
-      }}
-      style={{
-        padding: "8px 12px",
-        border: "1px solid #ccc",
-        background: tab === t ? "#111" : "#fff",
-        color: tab === t ? "#fff" : "#111",
-        cursor: "pointer",
-      }}
-    >
-      {label}
-    </button>
-  )
+  // ── Guard de paciente inválido ─────────────────────────────────────────
 
   if (!patientId || Number.isNaN(patientId)) {
-    return <p>Paciente no válido</p>
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-12 text-center">
+        <p className="text-slate-500 text-lg">Paciente no válido</p>
+        <Link
+          to="/patients"
+          className="mt-4 inline-block text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+        >
+          ← Volver a pacientes
+        </Link>
+      </div>
+    )
   }
 
+  // ── Estado de carga ────────────────────────────────────────────────────
+
   if (!patient) {
+    if (error) {
+      return (
+        <div className="max-w-5xl mx-auto px-4 py-12 text-center">
+          <div className="bg-red-50 rounded-2xl p-8 max-w-md mx-auto">
+            <p className="text-red-700 font-medium mb-2">Error al cargar paciente</p>
+            <p className="text-red-500 text-sm mb-4">{error}</p>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+            >
+              Reintentar
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    )
+  }
+
+  // ── Datos calculados ───────────────────────────────────────────────────
+
+  const latestMetric = summary?.latest_metrics
+  const age = calculateAge(patient.birth_date)
+  const bmi =
+    latestMetric?.weight_kg != null && latestMetric?.height_cm != null
+      ? calcIMC(latestMetric.weight_kg, latestMetric.height_cm)
+      : null
+  const sortedMetrics = [...metrics].sort(
+    (a, b) => new Date(a.recorded_at).getTime() - new Date(b.recorded_at).getTime()
+  )
+  const lastRecordedAt = sortedMetrics.length > 0
+    ? sortedMetrics[sortedMetrics.length - 1].recorded_at
+    : null
+
+  // ── Render principal ───────────────────────────────────────────────────
+
+  function renderDataView(p: Patient) {
+    const fields: { label: string; value: string | null | undefined }[] = [
+      { label: "Nombre", value: p.first_name },
+      { label: "Apellido", value: p.last_name },
+      { label: "Fecha de nacimiento", value: p.birth_date?.slice(0, 10) ?? null },
+      { label: "Sexo", value: p.sex },
+      { label: "Correo electrónico", value: p.email },
+      { label: "WhatsApp", value: p.whatsapp },
+      { label: "País", value: p.country },
+      { label: "Ciudad", value: p.city },
+      {
+        label: "Estado",
+        value: p.is_archived ? "Archivado" : p.is_active ? "Activo" : "Inactivo",
+      },
+    ]
+
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+        {fields.map((f) => (
+          <div key={f.label}>
+            <span className="text-xs text-slate-500">{f.label}</span>
+            <p className="text-sm text-slate-800">{f.value ?? "—"}</p>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  function renderProfileField(label: string, value: string | null | undefined) {
     return (
       <div>
-        <p>
-          <Link to="/patients">← Pacientes</Link>
-          {" · "}
-          <Link to={`/diets?patient=${patientId}`}>Dietas de este paciente</Link>
-        </p>
-        {error ? (
-          <p style={{ color: "#b00020" }}>{error}</p>
-        ) : (
-          <p>Cargando…</p>
-        )}
+        <span className="text-xs text-slate-500">{label}</span>
+        <p className="text-sm text-slate-800">{value ?? "—"}</p>
+      </div>
+    )
+  }
+
+  function renderTag(value: string) {
+    return (
+      <span
+        key={value}
+        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700"
+      >
+        {value}
+      </span>
+    )
+  }
+
+  function renderMultiTag(raw: string | null | undefined) {
+    if (!raw) return <span className="text-sm text-slate-400">—</span>
+    return (
+      <div className="flex flex-wrap gap-1">
+        {raw.split(", ").map((v) => renderTag(v))}
       </div>
     )
   }
 
   return (
-    <div>
-      <p>
-        <Link to="/patients">← Pacientes</Link>
-        {" · "}
-        <Link to={`/diets?patient=${patientId}`}>Dietas de este paciente</Link>
-      </p>
-      <h1 style={{ marginTop: 0 }}>
-        {patient.first_name} {patient.last_name}
-      </h1>
-      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
-        {tabBtn("summary", "Resumen")}
-        {tabBtn("data", "Datos demográficos")}
-        {tabBtn("profile", "Perfil clínico")}
-        {tabBtn("metrics", "Métricas")}
-      </div>
-      {error && <p style={{ color: "#b00020" }}>{error}</p>}
-      {msg && <p style={{ color: "#0a0" }}>{msg}</p>}
+    <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+      {/* ── Error banner ──────────────────────────────────────────────── */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
-      {/* ── Resumen ─────────────────────────────────────────────────────── */}
-      {tab === "summary" && (
-        <div>
-          {!summary ? (
-            <p>Cargando…</p>
+      {/* ── Breadcrumb + Actions ──────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <nav className="flex items-center gap-2 text-sm text-slate-500">
+          <Link
+            to="/patients"
+            className="hover:text-emerald-600 transition-colors font-medium"
+          >
+            ← Pacientes
+          </Link>
+          <span className="text-slate-300">/</span>
+          <span className="text-slate-800 font-semibold">
+            {patient.first_name} {patient.last_name}
+          </span>
+        </nav>
+
+        <div className="flex gap-2 flex-wrap">
+          {editingData || editingProfile ? (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingData(false)
+                setEditingProfile(false)
+              }}
+              className="px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:border-slate-300 transition-colors"
+            >
+              Cancelar edición
+            </button>
           ) : (
-            <div style={{ maxWidth: 560 }}>
-              <p>
-                <strong>Perfil completo:</strong>{" "}
-                {summary.profile_flags.is_profile_complete ? "sí" : "no"}
-              </p>
-              <p>
-                <strong>Alergias registradas:</strong>{" "}
-                {summary.profile_flags.has_allergies ? "sí" : "no"}
-              </p>
-              <p>
-                <strong>Enfermedades registradas:</strong>{" "}
-                {summary.profile_flags.has_diseases ? "sí" : "no"}
-              </p>
-              {summary.latest_metrics && (
-                <p>
-                  <strong>Último peso / talla:</strong>{" "}
-                  {summary.latest_metrics.weight_kg ?? "—"} kg ·{" "}
-                  {summary.latest_metrics.height_cm ?? "—"} cm
-                </p>
+            <button
+              type="button"
+              onClick={() => {
+                setDataFormKey((k) => k + 1)
+                setProfileFormKey((k) => k + 1)
+                setEditingData(true)
+                setEditingProfile(true)
+              }}
+              className="px-4 py-1.5 rounded-full text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              Editar
+            </button>
+          )}
+          <Link
+            to={`/diets/new?patient=${patientId}`}
+            className="px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:text-emerald-600 transition-colors"
+          >
+            Nueva Dieta
+          </Link>
+          <button
+            type="button"
+            onClick={() =>
+              addToast("Funcionalidad en desarrollo — pronto podrás enviar formularios", "info")
+            }
+            className="px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:border-slate-300 transition-colors"
+          >
+            Enviar Formulario
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMetricForm((v) => !v)}
+            className="px-4 py-1.5 rounded-full text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:text-emerald-600 transition-colors"
+          >
+            + Métricas
+          </button>
+        </div>
+      </div>
+
+      {/* ── Cabecera ────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-xl font-bold shrink-0 shadow-sm">
+            {getInitials(patient.first_name, patient.last_name)}
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-slate-900 truncate">
+              {patient.first_name} {patient.last_name}
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {[age != null && `${age} años`, patient.sex, patient.city]
+                .filter(Boolean)
+                .join(" · ") || "—"}
+            </p>
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+              {patient.email && (
+                <span className="text-sm text-slate-500">{patient.email}</span>
               )}
-              {summary.latest_diet && (
-                <p>
-                  <strong>Última dieta:</strong> #{summary.latest_diet.id} ·{" "}
-                  {summary.latest_diet.created_at}
-                  {summary.latest_diet.plan_duration_days != null &&
-                  summary.latest_diet.plan_duration_days > 0
-                    ? ` · ${summary.latest_diet.plan_duration_days} días`
-                    : ""}
-                </p>
+              {patient.whatsapp && (
+                <span className="text-sm text-slate-500">{patient.whatsapp}</span>
               )}
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Resumen ──────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
+              Datos corporales
+            </h2>
+            <div className="space-y-1.5 text-sm">
+              <p>
+                <span className="text-slate-500">Peso:</span>{" "}
+                <span className="text-slate-800 font-medium">
+                  {latestMetric?.weight_kg != null ? `${latestMetric.weight_kg} kg` : "—"}
+                </span>
+              </p>
+              <p>
+                <span className="text-slate-500">Altura:</span>{" "}
+                <span className="text-slate-800 font-medium">
+                  {latestMetric?.height_cm != null ? `${latestMetric.height_cm} cm` : "—"}
+                </span>
+              </p>
+              <p>
+                <span className="text-slate-500">IMC:</span>{" "}
+                <span className="text-slate-800 font-medium">
+                  {bmi != null
+                    ? `${bmi} (${bmiClassification(bmi)})`
+                    : "—"}
+                </span>
+              </p>
+            </div>
+            {lastRecordedAt && (
+              <p className="text-xs text-slate-400 mt-3">
+                Último registro: {timeAgo(lastRecordedAt)}
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col justify-center">
+            {metrics.filter((m) => m.weight_kg != null).length > 1 ? (
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                  Tendencia de peso
+                </p>
+                <WeightSparkline metrics={metrics} />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-xs text-slate-400">
+                  Se necesitan al menos 2 mediciones con peso para mostrar la tendencia
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {summary?.latest_diet && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                  Dieta activa
+                </span>
+                <div className="text-sm text-slate-600">
+                  Plan nutricional &middot; Creada el{" "}
+                  {formatDate(summary.latest_diet.created_at)}
+                  {summary.latest_diet.plan_duration_days != null &&
+                    summary.latest_diet.plan_duration_days > 0 &&
+                    ` · ${summary.latest_diet.plan_duration_days} días`}
+                </div>
+              </div>
+              <Link
+                to={`/diets/${summary.latest_diet.id}`}
+                className="text-sm text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap"
+              >
+                Ver dieta &rarr;
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Datos Demográficos ─────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-800">
+            Datos Demográficos
+          </h2>
+          {!editingData && (
+            <button
+              type="button"
+              onClick={() => {
+                setDataFormKey((k) => k + 1)
+                setEditingData(true)
+              }}
+              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              Editar
+            </button>
           )}
         </div>
-      )}
 
-      {/* ── Datos demográficos ──────────────────────────────────────────── */}
-      {tab === "data" && (
-        <form onSubmit={onSaveData} style={{ maxWidth: 480 }}>
-          <label style={{ fontSize: 13 }}>Nombre</label>
-          <input name="first_name" defaultValue={patient.first_name} style={inputStyle} required />
+        {editingData ? (
+          <form key={dataFormKey} onSubmit={onSaveData} className="space-y-4 max-w-lg">
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Nombre
+              </label>
+              <input
+                name="first_name"
+                defaultValue={patient.first_name}
+                className={INPUT_CLASSES}
+                required
+              />
+            </div>
 
-          <label style={{ fontSize: 13 }}>Apellido</label>
-          <input name="last_name" defaultValue={patient.last_name} style={inputStyle} required />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Apellido
+              </label>
+              <input
+                name="last_name"
+                defaultValue={patient.last_name}
+                className={INPUT_CLASSES}
+                required
+              />
+            </div>
 
-          <label style={{ fontSize: 13 }}>Fecha de nacimiento</label>
-          <input
-            name="birth_date"
-            type="date"
-            defaultValue={patient.birth_date?.slice(0, 10) ?? ""}
-            style={inputStyle}
-          />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Fecha de nacimiento
+              </label>
+              <input
+                name="birth_date"
+                type="date"
+                defaultValue={patient.birth_date?.slice(0, 10) ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
 
-          <label style={{ fontSize: 13 }}>Sexo</label>
-          <select name="sex" defaultValue={patient.sex ?? ""} style={selectStyle}>
-            <option value="">— Seleccionar —</option>
-            <option value="Masculino">Masculino</option>
-            <option value="Femenino">Femenino</option>
-            <option value="Otro">Otro</option>
-          </select>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Sexo
+              </label>
+              <select
+                name="sex"
+                defaultValue={patient.sex ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                <option value="Masculino">Masculino</option>
+                <option value="Femenino">Femenino</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
 
-          <label style={{ fontSize: 13 }}>Correo electrónico</label>
-          <input name="email" type="email" defaultValue={patient.email ?? ""} style={inputStyle} />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Correo electrónico
+              </label>
+              <input
+                name="email"
+                type="email"
+                defaultValue={patient.email ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
 
-          <label style={{ fontSize: 13 }}>WhatsApp</label>
-          <input name="whatsapp" defaultValue={patient.whatsapp ?? ""} style={inputStyle} />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                WhatsApp
+              </label>
+              <input
+                name="whatsapp"
+                defaultValue={patient.whatsapp ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
 
-          <label style={{ fontSize: 13 }}>País</label>
-          <input name="country" defaultValue={patient.country ?? ""} style={inputStyle} />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                País
+              </label>
+              <input
+                name="country"
+                defaultValue={patient.country ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
 
-          <label style={{ fontSize: 13 }}>Ciudad</label>
-          <input name="city" defaultValue={patient.city ?? ""} style={inputStyle} />
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Ciudad
+              </label>
+              <input
+                name="city"
+                defaultValue={patient.city ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
 
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-            <input type="checkbox" name="is_active" defaultChecked={patient.is_active} />
-            Activo
-          </label>
-          <label style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16 }}>
-            <input type="checkbox" name="is_archived" defaultChecked={patient.is_archived} />
-            Archivado
-          </label>
-          <button type="submit">Guardar</button>
-        </form>
-      )}
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_active"
+                  defaultChecked={patient.is_active}
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+                />
+                Activo
+              </label>
+              <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="is_archived"
+                  defaultChecked={patient.is_archived}
+                  className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500/20"
+                />
+                Archivado
+              </label>
+            </div>
 
-      {/* ── Perfil clínico ──────────────────────────────────────────────── */}
-      {tab === "profile" && (
-        <form onSubmit={onSaveProfile} style={{ maxWidth: 680 }}>
-
-          {/* Objetivo */}
-          <label style={{ fontSize: 13 }}>Objetivo</label>
-          <select name="objective" defaultValue={profile?.objective ?? ""} style={selectStyle}>
-            <option value="">— Seleccionar —</option>
-            <option value="Bajar de peso">Bajar de peso</option>
-            <option value="Mantenimiento">Mantenimiento</option>
-            <option value="Ganar músculo">Ganar músculo</option>
-            <option value="Subir de peso">Subir de peso</option>
-          </select>
-
-          {/* Enfermedades — multi-selección */}
-          <label style={{ fontSize: 13, display: "block", marginBottom: 4 }}>Enfermedades</label>
-          <PillSelect
-            options={DISEASE_OPTIONS}
-            selected={diseasesPills}
-            otherText={diseasesOther}
-            onChange={setDiseasesPills}
-            onOtherChange={setDiseasesOther}
-          />
-
-          {/* Medicamentos */}
-          <label style={{ fontSize: 13 }}>Medicamentos</label>
-          <textarea
-            name="medications"
-            rows={2}
-            defaultValue={profile?.medications ?? ""}
-            style={{ ...inputStyle, minHeight: 48 }}
-          />
-
-          {/* Alergias alimentarias — multi-selección */}
-          <label style={{ fontSize: 13, display: "block", marginBottom: 4 }}>Alergias alimentarias</label>
-          <PillSelect
-            options={ALLERGY_OPTIONS}
-            selected={allergiesPills}
-            otherText={allergiesOther}
-            onChange={setAllergiesPills}
-            onOtherChange={setAllergiesOther}
-          />
-
-          {/* Alimentos evitados — multi-selección */}
-          <label style={{ fontSize: 13, display: "block", marginBottom: 4 }}>Alimentos evitados</label>
-          <PillSelect
-            options={FOODS_AVOIDED_OPTIONS}
-            selected={foodsAvoidedPills}
-            otherText={foodsAvoidedOther}
-            onChange={setFoodsAvoidedPills}
-            onOtherChange={setFoodsAvoidedOther}
-          />
-
-          {/* Historial médico */}
-          <label style={{ fontSize: 13 }}>Historial médico</label>
-          <textarea
-            name="medical_history"
-            rows={2}
-            defaultValue={profile?.medical_history ?? ""}
-            style={{ ...inputStyle, minHeight: 48 }}
-          />
-
-          {/* Estilo dietario — multi-selección */}
-          <label style={{ fontSize: 13, display: "block", marginBottom: 4 }}>Estilo dietario</label>
-          <PillSelect
-            options={DIETARY_STYLE_OPTIONS}
-            selected={dietaryPills}
-            otherText={dietaryOther}
-            onChange={setDietaryPills}
-            onOtherChange={setDietaryOther}
-          />
-
-          {/* Preferencias alimentarias */}
-          <label style={{ fontSize: 13 }}>Preferencias alimentarias</label>
-          <textarea
-            name="food_preferences"
-            rows={2}
-            defaultValue={profile?.food_preferences ?? ""}
-            style={{ ...inputStyle, minHeight: 48 }}
-          />
-
-          {/* Alimentos no deseados */}
-          <label style={{ fontSize: 13 }}>Alimentos no deseados</label>
-          <textarea
-            name="disliked_foods"
-            rows={2}
-            defaultValue={profile?.disliked_foods ?? ""}
-            style={{ ...inputStyle, minHeight: 48 }}
-          />
-
-          {/* Agua */}
-          <label style={{ fontSize: 13 }}>Consumo de agua (L/día)</label>
-          <input
-            name="water_intake_liters"
-            type="number"
-            step="0.1"
-            min="0"
-            max="10"
-            defaultValue={profile?.water_intake_liters ?? ""}
-            style={inputStyle}
-          />
-
-          {/* Nivel de actividad */}
-          <label style={{ fontSize: 13 }}>Nivel de actividad</label>
-          <select name="activity_level" defaultValue={profile?.activity_level ?? ""} style={selectStyle}>
-            <option value="">— Seleccionar —</option>
-            <option value="Sedentario">Sedentario — sin ejercicio</option>
-            <option value="Ligero">Ligero — 1-2 días/semana</option>
-            <option value="Moderado">Moderado — 3-4 días/semana</option>
-            <option value="Alto">Alto — 5-6 días/semana</option>
-            <option value="Muy alto">Muy alto — atleta / entrenamiento diario</option>
-          </select>
-
-          {/* Estrés */}
-          <label style={{ fontSize: 13 }}>Nivel de estrés</label>
-          <select name="stress_level" defaultValue={profile?.stress_level ?? ""} style={selectStyle}>
-            <option value="">— Seleccionar —</option>
-            <option value="1">1 — Muy bajo</option>
-            <option value="2">2 — Bajo</option>
-            <option value="3">3 — Moderado</option>
-            <option value="4">4 — Alto</option>
-            <option value="5">5 — Muy alto</option>
-          </select>
-
-          {/* Calidad del sueño */}
-          <label style={{ fontSize: 13 }}>Calidad del sueño</label>
-          <select name="sleep_quality" defaultValue={profile?.sleep_quality ?? ""} style={selectStyle}>
-            <option value="">— Seleccionar —</option>
-            <option value="1">1 — Muy mala</option>
-            <option value="2">2 — Mala</option>
-            <option value="3">3 — Regular</option>
-            <option value="4">4 — Buena</option>
-            <option value="5">5 — Excelente</option>
-          </select>
-
-          {/* Horas de sueño */}
-          <label style={{ fontSize: 13 }}>Horas de sueño por noche</label>
-          <input
-            name="sleep_hours"
-            type="number"
-            step="0.5"
-            min="3"
-            max="12"
-            defaultValue={profile?.sleep_hours ?? ""}
-            style={inputStyle}
-          />
-
-          {/* Presupuesto */}
-          <label style={{ fontSize: 13 }}>Presupuesto para alimentación</label>
-          <select name="budget_level" defaultValue={profile?.budget_level ?? ""} style={selectStyle}>
-            <option value="">— Seleccionar —</option>
-            <option value="Bajo">Bajo</option>
-            <option value="Medio">Medio</option>
-            <option value="Medio-alto">Medio-alto</option>
-            <option value="Alto">Alto</option>
-          </select>
-
-          {/* Adherencia */}
-          <label style={{ fontSize: 13 }}>Nivel de adherencia esperado</label>
-          <select name="adherence_level" defaultValue={profile?.adherence_level ?? ""} style={selectStyle}>
-            <option value="">— Seleccionar —</option>
-            <option value="1">1 — Muy baja</option>
-            <option value="2">2 — Baja</option>
-            <option value="3">3 — Moderada</option>
-            <option value="4">4 — Alta</option>
-            <option value="5">5 — Muy alta</option>
-          </select>
-
-          {/* Días de ejercicio */}
-          <label style={{ fontSize: 13 }}>Días de ejercicio por semana</label>
-          <select
-            name="exercise_frequency_per_week"
-            defaultValue={profile?.exercise_frequency_per_week ?? ""}
-            style={selectStyle}
-          >
-            <option value="">— Seleccionar —</option>
-            {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
-              <option key={n} value={n}>
-                {n} {n === 1 ? "día" : "días"}
-              </option>
-            ))}
-          </select>
-
-          {/* Tipo de ejercicio — multi-selección */}
-          <label style={{ fontSize: 13, display: "block", marginBottom: 4 }}>Tipo de ejercicio</label>
-          <PillSelect
-            options={EXERCISE_TYPE_OPTIONS}
-            selected={exerciseTypePills}
-            otherText={exerciseTypeOther}
-            onChange={setExerciseTypePills}
-            onOtherChange={setExerciseTypeOther}
-          />
-
-          {/* Notas adicionales */}
-          <label style={{ fontSize: 13 }}>Notas adicionales</label>
-          <textarea
-            name="extra_notes"
-            rows={2}
-            defaultValue={profile?.extra_notes ?? ""}
-            style={{ ...inputStyle, minHeight: 48 }}
-          />
-
-          <button type="submit" style={{ marginTop: 8 }}>Guardar perfil</button>
-        </form>
-      )}
-
-      {/* ── Métricas ─────────────────────────────────────────────────────── */}
-      {tab === "metrics" && (
-        <div>
-          <form onSubmit={onAddMetric} style={{ maxWidth: 400, marginBottom: 24 }}>
-            <h2 style={{ fontSize: 16 }}>Agregar medición</h2>
-            <label style={{ fontSize: 13 }}>Peso (kg)</label>
-            <input value={mWeight} onChange={(e) => setMWeight(e.target.value)} style={inputStyle} />
-            <label style={{ fontSize: 13 }}>Talla (cm)</label>
-            <input value={mHeight} onChange={(e) => setMHeight(e.target.value)} style={inputStyle} />
-            <label style={{ fontSize: 13 }}>Notas</label>
-            <input value={mNotes} onChange={(e) => setMNotes(e.target.value)} style={inputStyle} />
-            <button type="submit">Agregar</button>
+            <div className="flex gap-2 pt-2">
+              <button
+                type="submit"
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+              >
+                Guardar
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingData(false)}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
           </form>
-          <table style={{ borderCollapse: "collapse", width: "100%", maxWidth: 800 }}>
-            <thead>
-              <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-                <th style={{ padding: 8 }}>Fecha</th>
-                <th style={{ padding: 8 }}>Peso</th>
-                <th style={{ padding: 8 }}>Talla</th>
-                <th style={{ padding: 8 }}>Fuente</th>
-              </tr>
-            </thead>
-            <tbody>
-              {metrics.map((m) => (
-                <tr key={m.id} style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: 8 }}>{m.recorded_at}</td>
-                  <td style={{ padding: 8 }}>{m.weight_kg ?? "—"}</td>
-                  <td style={{ padding: 8 }}>{m.height_cm ?? "—"}</td>
-                  <td style={{ padding: 8 }}>{m.source}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        ) : (
+          renderDataView(patient)
+        )}
+      </div>
+
+      {/* ── Perfil Clínico ────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-800">
+            Perfil Clínico
+          </h2>
+          {!editingProfile && (
+            <button
+              type="button"
+              onClick={() => {
+                setProfileFormKey((k) => k + 1)
+                setEditingProfile(true)
+              }}
+              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+            >
+              Editar perfil
+            </button>
+          )}
         </div>
-      )}
+
+        {editingProfile ? (
+          <form
+            key={profileFormKey}
+            onSubmit={onSaveProfile}
+            className="space-y-4 max-w-2xl"
+          >
+            {/* Objetivo */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Objetivo
+              </label>
+              <select
+                name="objective"
+                defaultValue={profile?.objective ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                <option value="Bajar de peso">Bajar de peso</option>
+                <option value="Mantenimiento">Mantenimiento</option>
+                <option value="Ganar músculo">Ganar músculo</option>
+                <option value="Subir de peso">Subir de peso</option>
+              </select>
+            </div>
+
+            {/* Enfermedades */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Enfermedades
+              </label>
+              <PillSelect
+                options={DISEASE_OPTIONS}
+                selected={diseasesPills}
+                otherText={diseasesOther}
+                onChange={setDiseasesPills}
+                onOtherChange={setDiseasesOther}
+              />
+            </div>
+
+            {/* Medicamentos */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Medicamentos
+              </label>
+              <textarea
+                name="medications"
+                rows={2}
+                defaultValue={profile?.medications ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
+
+            {/* Alergias */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Alergias alimentarias
+              </label>
+              <PillSelect
+                options={ALLERGY_OPTIONS}
+                selected={allergiesPills}
+                otherText={allergiesOther}
+                onChange={setAllergiesPills}
+                onOtherChange={setAllergiesOther}
+              />
+            </div>
+
+            {/* Alimentos evitados */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Alimentos evitados
+              </label>
+              <PillSelect
+                options={FOODS_AVOIDED_OPTIONS}
+                selected={foodsAvoidedPills}
+                otherText={foodsAvoidedOther}
+                onChange={setFoodsAvoidedPills}
+                onOtherChange={setFoodsAvoidedOther}
+              />
+            </div>
+
+            {/* Historial médico */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Historial médico
+              </label>
+              <textarea
+                name="medical_history"
+                rows={2}
+                defaultValue={profile?.medical_history ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
+
+            {/* Estilo dietario */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Estilo dietario
+              </label>
+              <PillSelect
+                options={DIETARY_STYLE_OPTIONS}
+                selected={dietaryPills}
+                otherText={dietaryOther}
+                onChange={setDietaryPills}
+                onOtherChange={setDietaryOther}
+              />
+            </div>
+
+            {/* Preferencias alimentarias */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Preferencias alimentarias
+              </label>
+              <textarea
+                name="food_preferences"
+                rows={2}
+                defaultValue={profile?.food_preferences ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
+
+            {/* Alimentos no deseados */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Alimentos no deseados
+              </label>
+              <textarea
+                name="disliked_foods"
+                rows={2}
+                defaultValue={profile?.disliked_foods ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
+
+            {/* Agua */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Consumo de agua (L/día)
+              </label>
+              <input
+                name="water_intake_liters"
+                type="number"
+                step="0.1"
+                min="0"
+                max="10"
+                defaultValue={profile?.water_intake_liters ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
+
+            {/* Nivel de actividad */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Nivel de actividad
+              </label>
+              <select
+                name="activity_level"
+                defaultValue={profile?.activity_level ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                <option value="Sedentario">Sedentario — sin ejercicio</option>
+                <option value="Ligero">Ligero — 1-2 días/semana</option>
+                <option value="Moderado">Moderado — 3-4 días/semana</option>
+                <option value="Alto">Alto — 5-6 días/semana</option>
+                <option value="Muy alto">Muy alto — atleta / entrenamiento diario</option>
+              </select>
+            </div>
+
+            {/* Estrés */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Nivel de estrés
+              </label>
+              <select
+                name="stress_level"
+                defaultValue={profile?.stress_level ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                <option value="1">1 — Muy bajo</option>
+                <option value="2">2 — Bajo</option>
+                <option value="3">3 — Moderado</option>
+                <option value="4">4 — Alto</option>
+                <option value="5">5 — Muy alto</option>
+              </select>
+            </div>
+
+            {/* Calidad del sueño */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Calidad del sueño
+              </label>
+              <select
+                name="sleep_quality"
+                defaultValue={profile?.sleep_quality ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                <option value="1">1 — Muy mala</option>
+                <option value="2">2 — Mala</option>
+                <option value="3">3 — Regular</option>
+                <option value="4">4 — Buena</option>
+                <option value="5">5 — Excelente</option>
+              </select>
+            </div>
+
+            {/* Horas de sueño */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Horas de sueño por noche
+              </label>
+              <input
+                name="sleep_hours"
+                type="number"
+                step="0.5"
+                min="3"
+                max="12"
+                defaultValue={profile?.sleep_hours ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
+
+            {/* Presupuesto */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Presupuesto para alimentación
+              </label>
+              <select
+                name="budget_level"
+                defaultValue={profile?.budget_level ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                <option value="Bajo">Bajo</option>
+                <option value="Medio">Medio</option>
+                <option value="Medio-alto">Medio-alto</option>
+                <option value="Alto">Alto</option>
+              </select>
+            </div>
+
+            {/* Adherencia */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Nivel de adherencia esperado
+              </label>
+              <select
+                name="adherence_level"
+                defaultValue={profile?.adherence_level ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                <option value="1">1 — Muy baja</option>
+                <option value="2">2 — Baja</option>
+                <option value="3">3 — Moderada</option>
+                <option value="4">4 — Alta</option>
+                <option value="5">5 — Muy alta</option>
+              </select>
+            </div>
+
+            {/* Días de ejercicio */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Días de ejercicio por semana
+              </label>
+              <select
+                name="exercise_frequency_per_week"
+                defaultValue={profile?.exercise_frequency_per_week ?? ""}
+                className={SELECT_CLASSES}
+              >
+                <option value="">— Seleccionar —</option>
+                {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
+                  <option key={n} value={n}>
+                    {n} {n === 1 ? "día" : "días"}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Tipo de ejercicio */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Tipo de ejercicio
+              </label>
+              <PillSelect
+                options={EXERCISE_TYPE_OPTIONS}
+                selected={exerciseTypePills}
+                otherText={exerciseTypeOther}
+                onChange={setExerciseTypePills}
+                onOtherChange={setExerciseTypeOther}
+              />
+            </div>
+
+            {/* Notas adicionales */}
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Notas adicionales
+              </label>
+              <textarea
+                name="extra_notes"
+                rows={2}
+                defaultValue={profile?.extra_notes ?? ""}
+                className={INPUT_CLASSES}
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="submit"
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+              >
+                Guardar perfil
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingProfile(false)}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </form>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+            {renderProfileField("Objetivo", profile?.objective)}
+            <div>
+              <span className="text-xs text-slate-500">Enfermedades</span>
+              {renderMultiTag(profile?.diseases)}
+            </div>
+            {renderProfileField("Medicamentos", profile?.medications)}
+            <div>
+              <span className="text-xs text-slate-500">Alergias alimentarias</span>
+              {renderMultiTag(profile?.food_allergies)}
+            </div>
+            <div>
+              <span className="text-xs text-slate-500">Alimentos evitados</span>
+              {renderMultiTag(profile?.foods_avoided)}
+            </div>
+            {renderProfileField("Historial médico", profile?.medical_history)}
+            <div>
+              <span className="text-xs text-slate-500">Estilo dietario</span>
+              {renderMultiTag(profile?.dietary_style)}
+            </div>
+            {renderProfileField("Preferencias alimentarias", profile?.food_preferences)}
+            {renderProfileField("Alimentos no deseados", profile?.disliked_foods)}
+            {renderProfileField(
+              "Consumo de agua",
+              profile?.water_intake_liters != null
+                ? `${profile.water_intake_liters} L/día`
+                : null
+            )}
+            {renderProfileField("Nivel de actividad", profile?.activity_level)}
+            {renderProfileField(
+              "Estrés",
+              profile?.stress_level != null ? `${profile.stress_level}/5` : null
+            )}
+            {renderProfileField(
+              "Calidad del sueño",
+              profile?.sleep_quality != null ? `${profile.sleep_quality}/5` : null
+            )}
+            {renderProfileField(
+              "Horas de sueño",
+              profile?.sleep_hours != null ? `${profile.sleep_hours} h` : null
+            )}
+            {renderProfileField("Presupuesto", profile?.budget_level)}
+            {renderProfileField(
+              "Adherencia",
+              profile?.adherence_level != null ? `${profile.adherence_level}/5` : null
+            )}
+            {renderProfileField(
+              "Ejercicio",
+              profile?.exercise_frequency_per_week != null
+                ? `${profile.exercise_frequency_per_week} días/sem`
+                : null
+            )}
+            <div>
+              <span className="text-xs text-slate-500">Tipo de ejercicio</span>
+              {renderMultiTag(profile?.exercise_type)}
+            </div>
+            {renderProfileField("Notas adicionales", profile?.extra_notes)}
+          </div>
+        )}
+      </div>
+
+      {/* ── Historial de Métricas ──────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-800">
+            Historial de Métricas
+          </h2>
+          <button
+            type="button"
+            onClick={() => setShowMetricForm((v) => !v)}
+            className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+          >
+            {showMetricForm ? "Cancelar" : "+ Registrar Métricas"}
+          </button>
+        </div>
+
+        {showMetricForm && (
+          <form
+            onSubmit={onAddMetric}
+            className="mb-6 p-4 bg-slate-50 rounded-xl space-y-3 max-w-md"
+          >
+            <p className="text-sm font-medium text-slate-700">Nueva medición</p>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Peso (kg)
+              </label>
+              <input
+                value={mWeight}
+                onChange={(e) => setMWeight(e.target.value)}
+                className={INPUT_CLASSES}
+                placeholder="ej. 65.0"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Altura (cm)
+              </label>
+              <input
+                value={mHeight}
+                onChange={(e) => setMHeight(e.target.value)}
+                className={INPUT_CLASSES}
+                placeholder="ej. 162"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-500 mb-1">
+                Notas
+              </label>
+              <input
+                value={mNotes}
+                onChange={(e) => setMNotes(e.target.value)}
+                className={INPUT_CLASSES}
+                placeholder="Opcional"
+              />
+            </div>
+            <button
+              type="submit"
+              className="px-4 py-2.5 rounded-xl text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              Registrar
+            </button>
+          </form>
+        )}
+
+        {/* Sparkline principal */}
+        {metrics.filter((m) => m.weight_kg != null).length > 1 && (
+          <div className="mb-4">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Tendencia de peso
+            </p>
+            <WeightSparkline metrics={metrics} />
+          </div>
+        )}
+
+        {/* Tabla */}
+        {metrics.length === 0 ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-slate-400">Sin métricas registradas</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Fecha
+                  </th>
+                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Peso (kg)
+                  </th>
+                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Altura (cm)
+                  </th>
+                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    IMC
+                  </th>
+                  <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    Fuente
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...metrics]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.recorded_at).getTime() -
+                      new Date(a.recorded_at).getTime()
+                  )
+                  .map((m) => {
+                    const imc = calcIMC(m.weight_kg, m.height_cm)
+                    return (
+                      <tr
+                        key={m.id}
+                        className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
+                      >
+                        <td className="py-2.5 px-3 text-slate-600 whitespace-nowrap">
+                          {formatDate(m.recorded_at)}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-800 font-medium">
+                          {m.weight_kg ?? "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-800">
+                          {m.height_cm ?? "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-600">
+                          {imc != null ? imc : "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-slate-500 capitalize">
+                          {m.source}
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── Dietas ──────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-800">Dietas</h2>
+          <Link
+            to={`/diets/new?patient=${patientId}`}
+            className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+          >
+            + Nueva Dieta
+          </Link>
+        </div>
+
+        {summary?.latest_diet ? (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 bg-emerald-50 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+                Dieta activa
+              </span>
+              <div className="text-sm text-slate-600">
+                Plan nutricional &middot; Creada el{" "}
+                {formatDate(summary.latest_diet.created_at)}
+                {summary.latest_diet.plan_duration_days != null &&
+                  summary.latest_diet.plan_duration_days > 0 &&
+                  ` · ${summary.latest_diet.plan_duration_days} días`}
+              </div>
+            </div>
+            <Link
+              to={`/diets/${summary.latest_diet.id}`}
+              className="text-sm text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap"
+            >
+              Ver dieta &rarr;
+            </Link>
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-sm text-slate-400">Sin dietas generadas</p>
+          </div>
+        )}
+
+        <div className="mt-3 text-right">
+          <Link
+            to={`/diets?patient=${patientId}`}
+            className="text-sm text-slate-500 hover:text-emerald-600 transition-colors"
+          >
+            Ver todas las dietas &rarr;
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }
