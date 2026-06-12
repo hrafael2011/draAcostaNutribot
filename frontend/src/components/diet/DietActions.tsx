@@ -1,3 +1,4 @@
+import { PencilSimple } from "@phosphor-icons/react"
 import Button from "../ui/Button"
 import QuickAdjustMenu from "./QuickAdjustMenu"
 import { useState } from "react"
@@ -7,9 +8,10 @@ type Props = {
   status: string
   onApprove: () => void
   onDiscard: () => void
-  onRegenerate: () => void
   onQuickAdjust: (key: string, label: string) => void
   onDownloadPdf: () => void
+  onToggleEdit?: () => void
+  editing?: boolean
   loading: boolean
 }
 
@@ -18,12 +20,14 @@ export default function DietActions({
   status,
   onApprove,
   onDiscard,
-  onRegenerate,
   onQuickAdjust,
   onDownloadPdf,
+  onToggleEdit,
+  editing,
   loading,
 }: Props) {
   const [showQuickAdjust, setShowQuickAdjust] = useState(false)
+  const isEditable = status === "pending_approval" || status === "generated"
 
   if (status === "pending_approval") {
     return (
@@ -42,21 +46,27 @@ export default function DietActions({
           </Button>
           {showQuickAdjust && <QuickAdjustMenu onSelect={onQuickAdjust} loading={loading} />}
         </div>
-        <Button variant="ghost" onClick={onRegenerate} disabled={loading} className="w-full text-sm">
-          🔄 Regenerar
+        <Button variant="ghost" onClick={onToggleEdit} className="w-full text-sm">
+          <span className="flex items-center justify-center gap-1.5">
+            <PencilSimple size={14} />
+            {editing ? "Dejar de editar" : "Editar comidas"}
+          </span>
         </Button>
       </div>
     )
   }
 
-  if (status === "generated" || status === "approved") {
+  if (status === "generated") {
     return (
       <div className="space-y-2">
         <Button onClick={onDownloadPdf} className="w-full">
           📄 Descargar PDF
         </Button>
-        <Button variant="ghost" onClick={onRegenerate} className="w-full text-sm">
-          🔄 Regenerar (nueva versión)
+        <Button variant="ghost" onClick={onToggleEdit} className="w-full text-sm">
+          <span className="flex items-center justify-center gap-1.5">
+            <PencilSimple size={14} />
+            {editing ? "Dejar de editar" : "Editar comidas"}
+          </span>
         </Button>
       </div>
     )

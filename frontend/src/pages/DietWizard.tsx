@@ -1,9 +1,9 @@
 import { useReducer, useState, useCallback } from "react"
 import { useNavigate, useSearchParams } from "react-router-dom"
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import {
   wizardReducer,
   initialWizardState,
+  NEXT_FEATURES,
   type WizardStep,
   type WizardState,
 } from "../types"
@@ -23,10 +23,9 @@ import ManualTargets from "../components/wizard/ManualTargets"
 import WizardConfirm from "../components/wizard/WizardConfirm"
 import WizardNavigation from "../components/wizard/WizardNavigation"
 import DietPreviewPanel from "../components/diet/DietPreviewPanel"
+import GenerationOverlay from "../components/ui/GenerationOverlay"
 
-const queryClient = new QueryClient()
-
-function DietWizardInner() {
+export default function DietWizard() {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const patientParam = searchParams.get("patient")
@@ -42,6 +41,7 @@ function DietWizardInner() {
 
   const [profileChecking, setProfileChecking] = useState(false)
   const [profileBlocked, setProfileBlocked] = useState<Patient | null>(null)
+  const [generating, setGenerating] = useState(false)
 
   const handlePatientSelect = useCallback(async (patient: Patient) => {
     dispatch({ type: "SET_FIELD", field: "patientId", value: patient.id })
@@ -110,25 +110,31 @@ function DietWizardInner() {
   }, [state])
 
   const handleGenerate = useCallback(async () => {
-    const body = buildBody()
-    const result = await generate.mutateAsync(body)
-    dispatch({ type: "SET_DIET", diet: result })
-    setStep("preview")
-  }, [buildBody, generate])
+    setGenerating(true)
+    try {
+      const body = buildBody()
+      const result = await generate.mutateAsync(body)
+      dispatch({ type: "SET_DIET", diet: result })
+      navigate(`/diets/${result.id}`, { replace: true })
+    } catch (err) {
+      setGenerating(false)
+      addToast(err instanceof Error ? err.message : "Error al generar dieta", "error")
+    }
+  }, [buildBody, generate, navigate, addToast])
 
-  const stepOrder: WizardStep[] = [
-    "patient", "note", "duration", "meals", "strategy", "confirm", "preview",
-  ]
+  const stepOrder: WizardStep[] = NEXT_FEATURES.advancedStrategies
+    ? ["patient", "note", "duration", "meals", "strategy", "confirm"]
+    : ["patient", "note", "duration", "meals", "confirm"]
   const currentIndex = stepOrder.indexOf(step)
 
   const goNext = useCallback(() => {
     if (currentIndex < stepOrder.length - 1) {
       const next = stepOrder[currentIndex + 1]
-      if (next === "confirm" && state.strategyMode === "guided" && !state.dietStyle) {
+      if (NEXT_FEATURES.advancedStrategies && next === "confirm" && state.strategyMode === "guided" && !state.dietStyle) {
         setStep("guided_style")
-      } else if (next === "confirm" && state.strategyMode === "guided" && state.dietStyle) {
+      } else if (NEXT_FEATURES.advancedStrategies && next === "confirm" && state.strategyMode === "guided" && state.dietStyle) {
         setStep("guided_macros")
-      } else if (next === "confirm" && state.strategyMode === "manual") {
+      } else if (NEXT_FEATURES.advancedStrategies && next === "confirm" && state.strategyMode === "manual") {
         setStep("manual_targets")
       } else {
         setStep(next)
@@ -139,9 +145,9 @@ function DietWizardInner() {
   const goBack = useCallback(() => {
     if (currentIndex > 0) {
       const prev = stepOrder[currentIndex - 1]
-      if (prev === "strategy" && state.strategyMode === "guided") {
+      if (NEXT_FEATURES.advancedStrategies && prev === "strategy" && state.strategyMode === "guided") {
         setStep("guided_macros")
-      } else if (prev === "strategy" && state.strategyMode === "manual") {
+      } else if (NEXT_FEATURES.advancedStrategies && prev === "strategy" && state.strategyMode === "manual") {
         setStep("manual_targets")
       } else {
         setStep(prev)
@@ -280,20 +286,16 @@ function DietWizardInner() {
         step={step}
         onBack={goBack}
         onNext={goNext}
-        hideNext={["patient", "confirm", "preview", "guided_style", "guided_macros", "manual_targets"].includes(step)}
+        hideNext={["patient", "confirm", "guided_style", "guided_macros", "manual_targets"].includes(step)}
         disableNext={
-          (step === "patient" && !state.patientId) ||
-          (step === "preview")
+          (step === "patient" && !state.patientId)
         }
       />
+      <GenerationOverlay
+        open={generating}
+        patientName={state.patientName}
+        onComplete={() => {}}
+      />
     </WizardContainer>
-  )
-}
-
-export default function DietWizard() {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <DietWizardInner />
-    </QueryClientProvider>
   )
 }

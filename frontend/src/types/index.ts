@@ -195,6 +195,12 @@ export type DietGenerateRequest = {
   } | null
 }
 
+export const NEXT_FEATURES = {
+  batchDiets: false,
+  advancedStrategies: false,  // Guided + Manual strategy modes (future feature)
+  regenerate: false,           // Regenerate diet feature (future feature)
+} as const;
+
 // --- Wizard types ---
 
 export type WizardStep =

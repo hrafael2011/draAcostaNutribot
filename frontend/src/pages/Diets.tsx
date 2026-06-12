@@ -1,6 +1,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react"
-import { Link, useSearchParams } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { BowlFood, MagnifyingGlass, Plus, X, Spinner } from "@phosphor-icons/react"
+import GenerationOverlay from "../components/ui/GenerationOverlay"
 import { generateDiet, getDiets, getPatients, getPlanDurationPresets } from "../services/api"
 import type { Diet, PaginatedDiets } from "../types"
 import type { DietStrategyMode, MealsPerDay } from "../types"
@@ -17,7 +18,7 @@ import {
 } from "../utils/duration"
 import { buildDietStrategyBody } from "../utils/dietStrategyBody"
 
-const NEXT_FEATURES = { batchDiets: false }
+const NEXT_FEATURES = { batchDiets: false, advancedStrategies: false }
 
 function extractKcal(diet: Diet): string {
   try {
@@ -55,6 +56,7 @@ const STATUS_CONFIG: Record<
 }
 
 export default function Diets() {
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const patientFromUrl = searchParams.get("patient")
 
@@ -92,6 +94,8 @@ export default function Diets() {
   const [manualCarbsG, setManualCarbsG] = useState("")
   const [manualFatG, setManualFatG] = useState("")
   const [genMsg, setGenMsg] = useState<string | null>(null)
+  const [generating, setGenerating] = useState(false)
+  const [generatingFor, setGeneratingFor] = useState("")
   const [durationPresets, setDurationPresets] = useState<number[]>(() => [
     ...FALLBACK_PLAN_DURATION_PRESETS,
   ])
@@ -127,7 +131,7 @@ export default function Diets() {
   }, [])
 
   useEffect(() => {
-    getPatients({ page: 1, page_size: 1000 })
+    getPatients({ page: 1, page_size: 100 })
       .then((res) => {
         const map: Record<number, { firstName: string; lastName: string; city?: string | null }> = {}
         for (const p of res.items) {
@@ -186,6 +190,8 @@ export default function Diets() {
     }
     setError(null)
     setGenMsg(null)
+    setGeneratingFor(selectedPatientName || "Paciente")
+    setGenerating(true)
     try {
       const clamped = clampDurationDays(genDuration)
       const strategy = buildDietStrategyBody({
@@ -206,11 +212,9 @@ export default function Diets() {
         duration_days: clamped,
         ...strategy,
       })
-      const hint = durationAdjustHint(genDuration)
-      setGenMsg(hint ? `${hint} Creada dieta #${d.id}.` : `Creada dieta #${d.id}`)
-      setGenInstr("")
-      await load()
+      navigate(`/diets/${d.id}`)
     } catch (err) {
+      setGenerating(false)
       setError(err instanceof Error ? err.message : "Error al generar")
     }
   }
@@ -355,6 +359,7 @@ export default function Diets() {
             </select>
           </div>
 
+          {NEXT_FEATURES.advancedStrategies && (<>
           {/* strategy mode */}
           <div className="mb-4">
             <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -503,6 +508,7 @@ export default function Diets() {
               </div>
             </div>
           )}
+          </>)}
 
           {/* instructions */}
           <div className="mb-4">
@@ -730,6 +736,11 @@ export default function Diets() {
           </div>
         </>
       )}
+      <GenerationOverlay
+        open={generating}
+        patientName={generatingFor}
+        onComplete={() => {}}
+      />
     </div>
   )
 }
