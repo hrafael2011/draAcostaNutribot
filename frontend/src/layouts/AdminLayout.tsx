@@ -25,7 +25,6 @@ const NAV_ITEMS = [
   { to: "/patients", label: "Pacientes", icon: Users },
   { to: "/diets", label: "Dietas", icon: BowlFood },
   { to: "/formularios", label: "Formularios", icon: LinkSimple },
-  { to: "/telegram", label: "Telegram", icon: LinkSimple },
 ]
 
 const ADMIN_ITEM = { to: "/admin/users", label: "Administración", icon: Gear }
@@ -38,7 +37,6 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   formularios: "Formularios",
   "intake-links": "Formularios",
   "admin/users": "Administración",
-  telegram: "Telegram",
 }
 
 function getBreadcrumbs(pathname: string) {
@@ -290,7 +288,7 @@ function DesktopSidebar({
       {/* Logo area */}
       <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">
         <img
-          src="/logo-sidebar.webp"
+          src="/logo-sidebar.png"
           alt="Nutribot"
           width={48}
           height={46}
@@ -355,7 +353,7 @@ function MobileSidebar({
       <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4">
         <div className="flex items-center gap-3">
           <img
-            src="/logo-sidebar.webp"
+            src="/logo-sidebar.png"
             alt="Nutribot"
             width={40}
             height={38}

@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from openai import AsyncOpenAI
@@ -39,10 +40,10 @@ def _normalize_plan_output(
 
     if not normalized_recs:
         normalized_recs = [
-            "Hidratación: distribuir el consumo de agua de forma constante durante el día, ajustado al peso, estatura, edad y actividad física.",
-            "Actividad física: mantener ejercicio regular según tolerancia y condición clínica.",
-            "Descanso: priorizar sueño nocturno suficiente y pausas de recuperación durante el día.",
-            "Adherencia: planificar comidas con anticipación y mantener horarios consistentes.",
+            "Hidratación: beber agua constante durante el día según peso y actividad física.",
+            "Actividad física: ejercicio regular adaptado a condición clínica y objetivo.",
+            "Descanso: dormir de 7 a 8 horas diarias para buena recuperación.",
+            "Adherencia: planificar comidas y mantener horarios fijos.",
         ]
     out["recommendations"] = normalized_recs
     requested_meals_per_day = None
@@ -88,11 +89,13 @@ async def generate_diet_plan_json(
         "Ejemplo correcto: '150 g de pechuga de pollo a la plancha, 1 taza (180 g) de arroz integral "
         "cocido, ensalada de tomate y pepino con 1 cdta de aceite de oliva.' "
         "Ejemplo incorrecto (sin cantidades): 'Pollo a la plancha con arroz y ensalada.' "
-        "En recommendations debes incluir explícitamente: "
-        "1) hidratación sugerida en litros/día según peso, estatura, edad y actividad; "
-        "2) recomendación de actividad física adaptada al objetivo y nivel de actividad; "
-        "3) recomendación de descanso/recuperación diaria; "
-        "4) consejos de adherencia. "
+        "En recommendations debes incluir EXACTAMENTE 3 items, MUY BREVES "
+        "(1 sola frase cada uno, sin desarrollo ni justificación): "
+        "1) hidratación: 'Beber X litros de agua al día' (calcula X según peso); "
+        "2) sueño: 'Dormir X horas cada noche' (X entre 7 y 8); "
+        "3) ejercicio: tipo y frecuencia semanal según objetivo y nivel de actividad. "
+        "NO agregues adherencia, monitoreo, variedad ni ningún otro tema. "
+        "Máximo 1 frase de 1 línea por cada item. "
         "La nota del doctor (doctor_instruction) es opcional y solo orienta la composición del plan; "
         "NO copies textualmente esa nota en recommendations. "
         "Si nutrition_targets incluye strategy_mode / applied_mode / applied_preferences, "
@@ -136,3 +139,86 @@ async def generate_diet_plan_json(
         _parse_json_response(content),
         nutrition_targets=nutrition_targets,
     )
+
+
+async def recalculate_macros_from_meals(
+    plan: dict[str, Any],
+    meals_per_day: int = 4,
+) -> dict[str, Any]:
+    """Ask GPT to estimate macros from the current meal plan text after edits."""
+    if not settings.OPENAI_API_KEY:
+        return plan
+
+    client = AsyncOpenAI(
+        api_key=settings.OPENAI_API_KEY,
+        base_url=settings.OPENAI_BASE_URL,
+    )
+
+    days = plan.get("days", [])
+    meal_summary_parts = []
+    for day in days[:7]:
+        if isinstance(day, dict):
+            meals = day.get("meals", {})
+            if isinstance(meals, dict):
+                for slot, text in meals.items():
+                    if text and isinstance(text, str):
+                        meal_summary_parts.append(f"- {slot}: {text}")
+
+    if not meal_summary_parts:
+        return plan
+
+    meal_texts = "\n".join(meal_summary_parts)
+
+    prompt = (
+        f"Eres nutricionista. A partir de este plan de comidas diario ({meals_per_day} comidas/día), "
+        "estima los macros totales diarios y calorías totales diarias.\n\n"
+        f"Plan de comidas (1 día típico):\n{meal_texts}\n\n"
+        "Responde SOLO con JSON válido en este formato exacto:\n"
+        '{"daily_calories": 1800, "protein_g": 120.5, "carbs_g": 180.0, "fat_g": 55.0}\n\n'
+        "Sé preciso con las cantidades. Usa gramos con 1 decimal. "
+        "Las calorías deben ser coherentes con los macros (protein×4 + carbs×4 + fat×9)."
+    )
+
+    try:
+        resp = await client.chat.completions.create(
+            model=settings.OPENAI_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.2,
+            max_tokens=150,
+        )
+        content = resp.choices[0].message.content
+        if content:
+            macros = json.loads(content.strip())
+            pg = macros.get("protein_g", 0) or 0
+            cg = macros.get("carbs_g", 0) or 0
+            fg = macros.get("fat_g", 0) or 0
+            dc = macros.get("daily_calories", 0) or 0
+
+            plan["daily_calories"] = dc
+            plan["macro_grams"] = {
+                "protein": pg,
+                "carbs": cg,
+                "fat": fg,
+            }
+            # Also update nutrition_engine for NutritionSummary component
+            engine = plan.get("nutrition_engine", {})
+            if isinstance(engine, dict):
+                engine["goal_calories"] = dc
+                plan["nutrition_engine"] = engine
+
+            p = pg * 4
+            c = cg * 4
+            f = fg * 9
+            total = p + c + f or 1
+            plan["macro_percentages"] = {
+                "protein": round(p / total * 100, 1),
+                "carbs": round(c / total * 100, 1),
+                "fat": round(f / total * 100, 1),
+            }
+            plan["macros_recalculated"] = True
+            plan["macros_recalculated_at"] = datetime.now(timezone.utc).isoformat()
+    except Exception:
+        pass
+
+    return plan

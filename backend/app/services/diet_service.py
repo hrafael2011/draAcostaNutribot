@@ -6,6 +6,7 @@ from typing import Any, Optional, Tuple
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.logic.diet_duration import (
     apply_plan_duration_metadata,
@@ -26,7 +27,7 @@ from app.models import (
     PatientProfile,
     utcnow,
 )
-from app.services.diet_openai import generate_diet_plan_json
+from app.services.diet_openai import generate_diet_plan_json, recalculate_macros_from_meals
 from app.services.plan_meals import meal_slots_for_count, normalize_meals_per_day
 
 
@@ -353,10 +354,10 @@ async def update_diet_meals(
     diet = await _diet_for_update(db, diet_id, doctor.id)
     if diet is None:
         raise DietGenerationError("not_found", "Diet not found")
-    if diet.status != "pending_approval":
+    if diet.status not in ("pending_approval", "generated"):
         raise DietGenerationError(
             "invalid_state",
-            "Solo se pueden editar comidas de borradores pendientes de aprobación",
+            "Solo se pueden editar comidas de dietas activas o pendientes de aprobación",
         )
 
     plan = dict(diet.structured_plan_json) if isinstance(diet.structured_plan_json, dict) else {}
@@ -397,7 +398,17 @@ async def update_diet_meals(
             )
         )
 
+    # Recalculate macros via GPT based on edited meal text
+    try:
+        meals_per_day = plan.get("meals_per_day", 4)
+        plan = await recalculate_macros_from_meals(plan, meals_per_day=meals_per_day)
+    except Exception:
+        pass
+
     diet.structured_plan_json = plan
+    flag_modified(diet, "structured_plan_json")
+    if diet.status == "generated":
+        diet.status = "pending_approval"
     diet.updated_at = utcnow()
     return diet
 

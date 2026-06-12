@@ -18,7 +18,7 @@ import type {
 import { notifyUnauthorized } from "./authBridge"
 
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8001/api"
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:8002/api"
 
 const TOKEN_KEY = "diet_admin_token"
 

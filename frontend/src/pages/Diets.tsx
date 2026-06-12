@@ -1,12 +1,11 @@
-import { FormEvent, useCallback, useEffect, useState } from "react"
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { BowlFood, MagnifyingGlass, Plus, X, Spinner } from "@phosphor-icons/react"
+import { BowlFood, CaretDown, MagnifyingGlass, Plus, X, Spinner } from "@phosphor-icons/react"
 import GenerationOverlay from "../components/ui/GenerationOverlay"
 import { generateDiet, getDiets, getPatients, getPlanDurationPresets } from "../services/api"
 import type { Diet, PaginatedDiets } from "../types"
 import type { DietStrategyMode, MealsPerDay } from "../types"
 import { DurationPresetButtons } from "../components/DurationPresetButtons"
-import { Badge } from "../components/ui/Badge"
 import { Avatar } from "../components/ui/Avatar"
 import { SkeletonRow } from "../components/ui/Skeleton"
 import { EmptyState } from "../components/ui/EmptyState"
@@ -20,39 +19,12 @@ import { buildDietStrategyBody } from "../utils/dietStrategyBody"
 
 const NEXT_FEATURES = { batchDiets: false, advancedStrategies: false }
 
-function extractKcal(diet: Diet): string {
-  try {
-    const plan = diet.structured_plan_json as Record<string, unknown>
-    const nutrition = plan.nutrition_summary as Record<string, unknown> | undefined
-    if (nutrition?.daily_calories) return `${nutrition.daily_calories} kcal`
-  } catch {
-    /* ignore */
-  }
-  return "—"
-}
-
-function relativeDate(dateStr: string): string {
-  const now = new Date()
-  const date = new Date(dateStr)
-  const diffMs = now.getTime() - date.getTime()
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return "Hoy"
-  if (diffDays === 0) return "Hoy"
-  if (diffDays === 1) return "Ayer"
-  if (diffDays < 7) return `Hace ${diffDays} días`
-  if (diffDays < 30) return `Hace ${Math.floor(diffDays / 7)} semanas`
-  if (diffDays < 365) return `Hace ${Math.floor(diffDays / 30)} meses`
-  return `Hace ${Math.floor(diffDays / 365)} años`
-}
-
-const STATUS_CONFIG: Record<
-  string,
-  { variant: "success" | "warning" | "danger" | "neutral" | "info"; label: string }
-> = {
-  generated: { variant: "success", label: "Activa" },
-  pending_approval: { variant: "warning", label: "Pendiente" },
-  discarded: { variant: "neutral", label: "Descartada" },
-  draft: { variant: "info", label: "Borrador" },
+function formatDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleDateString("es-VE", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
 }
 
 export default function Diets() {
@@ -70,6 +42,18 @@ export default function Diets() {
     patientFromUrl ? Number(patientFromUrl) : undefined,
   )
   const [selectedPatientName, setSelectedPatientName] = useState<string | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [allPatients, setAllPatients] = useState<{ id: number; first_name: string; last_name: string; city?: string | null }[]>([])
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  // Load all patients when dropdown opens
+  useEffect(() => {
+    if (filterOpen && allPatients.length === 0) {
+      getPatients({ page: 1, page_size: 100 }).then(res => {
+        setAllPatients(res.items.map(p => ({ id: p.id, first_name: p.first_name, last_name: p.last_name, city: p.city })))
+      }).catch(() => {})
+    }
+  }, [filterOpen, allPatients.length])
 
   /* ---------- patient name map (table display) ---------- */
   const [patientNameMap, setPatientNameMap] = useState<
@@ -113,6 +97,13 @@ export default function Diets() {
     results: formResults,
     loading: formLoading,
   } = usePatientSearch()
+
+  // Filter patients client-side based on query
+  const displayedPatients = filterQuery.trim().length >= 2
+    ? allPatients.filter(p =>
+        `${p.first_name} ${p.last_name}`.toLowerCase().includes(filterQuery.toLowerCase())
+      )
+    : allPatients
 
   /* ---------- effects ---------- */
   useEffect(() => {
@@ -222,18 +213,11 @@ export default function Diets() {
   const genDurationAdjustHint = durationAdjustHint(genDuration)
 
   /* ---------- helpers ---------- */
-  function renderStatusBadge(status: string) {
-    const cfg = STATUS_CONFIG[status] ?? { variant: "neutral" as const, label: status }
-    return <Badge variant={cfg.variant}>{cfg.label}</Badge>
-  }
-
   function getPatientName(diet: Diet): { firstName: string; lastName: string } | null {
     const p = patientNameMap[diet.patient_id]
     if (p) return { firstName: p.firstName, lastName: p.lastName }
     return null
   }
-
-  const hasBatch = NEXT_FEATURES.batchDiets
 
   /* ========== render ========== */
   return (
@@ -545,78 +529,88 @@ export default function Diets() {
         </div>
       )}
 
-      {/* filter bar */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <div className="relative min-w-[240px] flex-1">
-          <MagnifyingGlass
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <input
-            type="text"
-            value={filterQuery}
-            onChange={(e) => setFilterQuery(e.target.value)}
-            placeholder="Filtrar por paciente..."
-            className="w-full rounded-lg border border-slate-300 py-2 pl-10 pr-3 text-sm placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-          />
-          {filterLoading && (
-            <Spinner
-              size={16}
-              className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400"
-            />
-          )}
-        </div>
+      {/* ComboBox filter — dropdown with search */}
+      <div className="mb-6 relative" ref={filterRef}>
         <button
           type="button"
-          onClick={() => load()}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
+          onClick={() => { setFilterOpen(!filterOpen); setFilterQuery("") }}
+          className={`flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm transition-colors min-w-[260px] ${
+            filterOpen ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-slate-300 hover:border-slate-400"
+          }`}
         >
-          Actualizar
+          {patientIdFilter != null && selectedPatientName ? (
+            <>
+              <span className="flex-1 text-left text-slate-800 font-medium">{selectedPatientName}</span>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); clearFilter() }}
+                className="text-slate-400 hover:text-slate-600"
+              >
+                <X size={16} />
+              </button>
+            </>
+          ) : (
+            <>
+              <MagnifyingGlass size={16} className="text-slate-400 shrink-0" />
+              <span className="flex-1 text-left text-slate-400">Buscar paciente...</span>
+              <CaretDown size={14} className="text-slate-400 shrink-0" />
+            </>
+          )}
         </button>
+
+        {/* Dropdown */}
+        {filterOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
+            <div className="absolute z-20 mt-1 w-full max-w-sm rounded-xl border border-slate-200 bg-white shadow-xl">
+              {/* Search input inside dropdown */}
+              <div className="relative border-b border-slate-100 p-2">
+                <MagnifyingGlass size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  autoFocus
+                  value={filterQuery}
+                  onChange={(e) => setFilterQuery(e.target.value)}
+                  placeholder="Escribe para buscar..."
+                  className="w-full rounded-lg border-0 bg-slate-50 py-2 pl-8 pr-3 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+              </div>
+              {/* Results */}
+              <div className="max-h-64 overflow-y-auto">
+                {allPatients.length === 0 ? (
+                  <div className="flex items-center justify-center py-6">
+                    <Spinner size={20} className="animate-spin text-slate-400" />
+                  </div>
+                ) : displayedPatients.length > 0 ? (
+                  displayedPatients.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => { handleFilterSelect(p.id, p.first_name, p.last_name); setFilterOpen(false) }}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-slate-50"
+                    >
+                      <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
+                      <div>
+                        <span className="font-medium text-slate-800">{p.first_name} {p.last_name}</span>
+                        {p.city && <span className="ml-1.5 text-xs text-slate-400">{p.city}</span>}
+                      </div>
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-4 py-6 text-center text-sm text-slate-400">No se encontraron pacientes</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* search results dropdown */}
-      {filterResults.length > 0 && (
-        <div className="mb-4 rounded-lg border border-slate-200 bg-white shadow-lg">
-          <ul className="divide-y divide-slate-100">
-            {filterResults.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  onClick={() => handleFilterSelect(p.id, p.first_name, p.last_name)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm transition-colors hover:bg-slate-50"
-                >
-                  <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
-                  <div className="flex-1">
-                    <span className="font-medium text-slate-900">
-                      {p.first_name} {p.last_name}
-                    </span>
-                    {p.city && <span className="ml-2 text-xs text-slate-500">{p.city}</span>}
-                  </div>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* active filter chip */}
+      {/* active filter info */}
       {patientIdFilter != null && selectedPatientName && (
-        <div className="mb-4 flex items-center gap-2">
-          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1.5 text-sm text-emerald-700 ring-1 ring-emerald-600/20">
-            {selectedPatientName}
-            <button
-              type="button"
-              onClick={clearFilter}
-              className="text-emerald-500 hover:text-emerald-700"
-            >
-              <X size={14} />
-            </button>
-          </span>
-          <span className="text-xs text-slate-400">
-            {data ? `${data.total} dietas encontradas` : ""}
-          </span>
-        </div>
+        <p className="mb-4 text-sm text-slate-500">
+          Mostrando dietas de <span className="font-medium text-slate-700">{selectedPatientName}</span>
+          {data ? ` · ${data.total} encontradas` : ""}
+        </p>
       )}
 
       {/* loading state */}
@@ -650,64 +644,38 @@ export default function Diets() {
       ) : (
         <>
           {/* table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  {hasBatch && (
-                    <th className="w-10 px-4 py-3">
-                      <input type="checkbox" className="rounded" />
-                    </th>
+          <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            {data.items.map((d: Diet) => {
+              const name = getPatientName(d)
+              const plan = d.structured_plan_json as Record<string, unknown> | undefined
+              const days = (plan?.plan_duration_days as number) ?? 7
+              return (
+                <Link
+                  key={d.id}
+                  to={`/diets/${d.id}`}
+                  className="flex items-center gap-4 px-5 py-3.5 border-b border-slate-100 last:border-b-0 transition-colors hover:bg-slate-50 cursor-pointer group"
+                >
+                  {name ? (
+                    <Avatar firstName={name.firstName} lastName={name.lastName} size="md" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500 shrink-0">
+                      ?
+                    </div>
                   )}
-                  <th className="px-4 py-3 font-semibold text-slate-700">Paciente</th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">Plan</th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">Estado</th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">Generada</th>
-                  <th className="px-4 py-3 font-semibold text-slate-700">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.items.map((d: Diet) => {
-                  const name = getPatientName(d)
-                  return (
-                    <tr key={d.id} className="transition-colors hover:bg-slate-50">
-                      {hasBatch && (
-                        <td className="px-4 py-3">
-                          <input type="checkbox" className="rounded" />
-                        </td>
-                      )}
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          {name ? (
-                            <Avatar firstName={name.firstName} lastName={name.lastName} size="sm" />
-                          ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-500">
-                              ?
-                            </div>
-                          )}
-                          <span className="font-medium text-slate-900">
-                            {name
-                              ? `${name.firstName} ${name.lastName}`
-                              : `Paciente #${d.patient_id}`}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600">{extractKcal(d)}</td>
-                      <td className="px-4 py-3">{renderStatusBadge(d.status)}</td>
-                      <td className="px-4 py-3 text-xs text-slate-500">{relativeDate(d.created_at)}</td>
-                      <td className="px-4 py-3">
-                        <Link
-                          to={`/diets/${d.id}`}
-                          className="font-medium text-emerald-600 transition-colors hover:text-emerald-500"
-                        >
-                          Ver &rarr;
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">
+                      {name ? `${name.firstName} ${name.lastName}` : `Paciente #${d.patient_id}`}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {formatDate(d.created_at)} · {days} días
+                    </p>
+                  </div>
+                  <span className="text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0">
+                    &rarr;
+                  </span>
+                </Link>
+              )
+            })}
           </div>
 
           {/* pagination */}

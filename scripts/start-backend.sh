@@ -3,10 +3,10 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/backend"
-PORT="${DIET_AGENT_PORT:-8001}"
+PORT="${DIET_AGENT_PORT:-8002}"
 if [ ! -d .venv ]; then
   echo "Crea el venv: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
   exit 1
 fi
 echo "Diet Telegram Agent → http://0.0.0.0:${PORT} (health: /api/health)"
-exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+exec .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --reload

@@ -36,9 +36,9 @@ export default function Login() {
         {/* Logo + name */}
         <div className="mb-8 text-center">
           <img
-            src="/logo-login.webp"
+            src="/logo-login.png"
             alt="Dra. Acosta Nutribot"
-            className="mx-auto mb-4 rounded-2xl shadow-md"
+            className="mx-auto mb-4"
             width={180}
             height={174}
           />

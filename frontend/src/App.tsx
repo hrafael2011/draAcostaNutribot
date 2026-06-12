@@ -11,7 +11,6 @@ import IntakeLinks from "./pages/IntakeLinks"
 import Diets from "./pages/Diets"
 import DietDetail from "./pages/DietDetail"
 import DietWizard from "./pages/DietWizard"
-import Telegram from "./pages/Telegram"
 import PublicIntake from "./pages/PublicIntake"
 import NotFound from "./pages/NotFound"
 
@@ -39,7 +38,6 @@ export default function App() {
         <Route path="diets/:dietId/regenerate" element={<DietWizard />} />
         <Route path="diets" element={<Diets />} />
         <Route path="diets/:dietId" element={<DietDetail />} />
-        <Route path="telegram" element={<Telegram />} />
         <Route path="admin/users" element={<AdminUsers />} />
       </Route>
       <Route path="*" element={<NotFound />} />

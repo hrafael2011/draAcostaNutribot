@@ -65,7 +65,7 @@ async def list_patients(
     search: Optional[str] = None,
     status_filter: Optional[str] = Query(None, alias="status"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int = Query(20, ge=1, le=500),
 ):
     conditions = [Patient.doctor_id == doctor.id]
     if status_filter == "archived":

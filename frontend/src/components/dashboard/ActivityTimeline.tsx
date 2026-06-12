@@ -15,12 +15,26 @@ const ACTION_LABELS: Record<string, string> = {
   diet_generated: "Dieta generada para {patient}",
   diet_regenerated: "Dieta regenerada para {patient}",
   diet_approved: "Dieta aprobada para {patient}",
+  diet_edit_meal_web: "Comida editada para {patient}",
   patient_created: "Paciente {patient} creado",
   patient_updated: "Paciente {patient} actualizado",
   intake_link_created: "Formulario enviado a {patient}",
   intake_submitted: "Formulario completado por {patient}",
-  metric_added: "Metricas registradas para {patient}",
+  metric_added: "Medidas registradas para {patient}",
   profile_updated: "Perfil actualizado de {patient}",
+};
+
+const ACTION_FALLBACK: Record<string, string> = {
+  diet_generated: "Se generó una nueva dieta",
+  diet_regenerated: "Se regeneró una dieta existente",
+  diet_approved: "Se aprobó una dieta",
+  diet_edit_meal_web: "Se editó una comida",
+  patient_created: "Se registró un nuevo paciente",
+  patient_updated: "Se actualizaron los datos de un paciente",
+  intake_link_created: "Se envió un formulario de ingesta",
+  intake_submitted: "Un paciente completó su formulario",
+  metric_added: "Se registraron nuevas medidas",
+  profile_updated: "Se actualizó un perfil clínico",
 };
 
 function timeAgo(dateStr: string): string {
@@ -38,10 +52,12 @@ function timeAgo(dateStr: string): string {
 
 function describeAction(a: Activity): string {
   const action = a.action ?? "";
-  const patient = a.patient_name ?? "paciente";
-  const template = ACTION_LABELS[action];
-  if (template) return template.replace("{patient}", patient);
-  return `${action} — ${patient}`;
+  const patient = a.patient_name;
+  if (patient) {
+    const template = ACTION_LABELS[action];
+    if (template) return template.replace("{patient}", patient);
+  }
+  return ACTION_FALLBACK[action] ?? "Actividad reciente";
 }
 
 export function ActivityTimeline({ activities }: { activities: Activity[] }) {

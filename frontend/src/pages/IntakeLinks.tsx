@@ -38,7 +38,7 @@ export default function IntakeLinks() {
     setError(null)
     const [ls, pg] = await Promise.all([
       getIntakeLinks(),
-      getPatients({ page: 1, page_size: 200 }),
+      getPatients({ page: 1, page_size: 100 }),
     ])
     setLinks(ls)
     setPatients(pg.items)

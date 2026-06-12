@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { getDiet } from "../services/api"
+import { downloadDietPdf, getDiet } from "../services/api"
 import type { Diet } from "../types"
 import DietPreviewPanel from "../components/diet/DietPreviewPanel"
+import GenerationOverlay from "../components/ui/GenerationOverlay"
 import { useDietGeneration } from "../hooks/useDietGeneration"
 import { useToast } from "../context/ToastContext"
 
@@ -11,8 +12,8 @@ export default function DietDetail() {
   const id = Number(dietId)
   const [diet, setDiet] = useState<Diet | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const { editMeals } = useDietGeneration()
   const { addToast } = useToast()
 
@@ -32,6 +33,18 @@ export default function DietDetail() {
       addToast("La dieta volverá a estado pendiente de aprobación después de editar", "info")
     }
     setEditing(!editing)
+  }
+
+  const handleDownloadPdf = async () => {
+    if (!diet) return
+    setPdfLoading(true)
+    try {
+      await downloadDietPdf(diet.id)
+    } catch (err: unknown) {
+      addToast(err instanceof Error ? err.message : "Error al descargar PDF", "error")
+    } finally {
+      setPdfLoading(false)
+    }
   }
 
   const handleMealSave = (dayIndex: number, slotKey: string, text: string) => {
@@ -104,10 +117,6 @@ export default function DietDetail() {
       {error && (
         <div className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>
       )}
-      {msg && (
-        <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{msg}</div>
-      )}
-
       {/* Diet Preview */}
       <DietPreviewPanel
         diet={diet}
@@ -118,6 +127,7 @@ export default function DietDetail() {
           import("../services/api").then(({ approveDiet }) =>
             approveDiet(diet.id).then((d) => {
               setDiet(d)
+              setEditing(false)
               addToast("Dieta aprobada", "success")
             })
           )
@@ -126,10 +136,24 @@ export default function DietDetail() {
           import("../services/api").then(({ discardDiet }) =>
             discardDiet(diet.id).then((d) => {
               setDiet(d)
+              setEditing(false)
               addToast("Dieta descartada", "success")
             })
           )
         }}
+        onDownloadPdf={handleDownloadPdf}
+      />
+      <GenerationOverlay
+        open={pdfLoading}
+        patientName=""
+        label="Descargando PDF..."
+        doneLabel="¡PDF descargado!"
+        steps={[
+          { pct: 30, msg: "Preparando documento..." },
+          { pct: 60, msg: "Renderizando plan nutricional..." },
+          { pct: 90, msg: "Finalizando..." },
+        ]}
+        onComplete={() => {}}
       />
     </div>
   )

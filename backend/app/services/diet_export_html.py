@@ -51,11 +51,17 @@ class LayoutProfile:
 
 
 LAYOUT_PROFILES: tuple[LayoutProfile, ...] = (
-    LayoutProfile(0.845, 14.8, 1.42, 10.5, 16.0, 18.0, 8.0, 142.0, 22.0, 14.0, 16.0, 13.0, 18.0, 10.0, 28.0, 5.0),
-    LayoutProfile(0.81, 14.0, 1.34, 8.5, 13.5, 16.5, 6.5, 132.0, 21.0, 13.2, 14.5, 10.0, 14.0, 7.0, 22.0, 3.0),
-    LayoutProfile(0.77, 13.0, 1.27, 6.8, 11.0, 15.0, 5.5, 120.0, 20.0, 12.2, 13.2, 8.0, 11.0, 5.0, 18.0, 2.0),
-    LayoutProfile(0.72, 12.0, 1.20, 5.4, 8.5, 13.5, 4.5, 108.0, 18.5, 11.2, 12.0, 6.0, 9.0, 4.0, 14.0, 1.0),
-    LayoutProfile(0.66, 11.0, 1.14, 4.0, 6.5, 12.2, 3.8, 96.0, 17.0, 10.4, 10.8, 4.5, 7.0, 3.0, 10.0, 0.0),
+    # content_scale, cell_font, cell_line_h, cell_pad_y, cell_pad_x, header_font, header_pad, logo_w, title_font, energy_font, note_font, note_pad_y, note_pad_x, note_margin_top, brand_gap, brand_margin_bot
+    # Profile 0: máximo — casi toda la hoja
+    LayoutProfile(0.94, 17.0, 1.48, 18.0, 16.0, 21.0, 10.0, 150.0, 25.0, 17.0, 17.0, 14.0, 20.0, 8.0, 26.0, 5.0),
+    # Profile 1
+    LayoutProfile(0.90, 16.0, 1.45, 16.0, 15.0, 19.5, 9.0, 144.0, 23.5, 16.0, 16.0, 12.5, 18.0, 7.0, 22.0, 4.0),
+    # Profile 2
+    LayoutProfile(0.86, 15.0, 1.42, 14.0, 14.0, 18.0, 8.0, 136.0, 22.0, 15.0, 15.0, 11.0, 16.0, 6.0, 18.0, 3.0),
+    # Profile 3
+    LayoutProfile(0.81, 14.0, 1.38, 12.0, 13.0, 16.5, 7.0, 126.0, 20.5, 14.0, 14.0, 9.5, 14.0, 5.0, 14.0, 2.0),
+    # Profile 4
+    LayoutProfile(0.75, 13.0, 1.32, 9.0, 12.0, 15.0, 6.0, 114.0, 18.5, 12.5, 12.5, 7.5, 11.0, 4.0, 10.0, 0.0),
 )
 
 
@@ -106,14 +112,21 @@ def _energy_line(patient: Optional[Patient], plan: dict[str, Any]) -> str:
 def _recommendations(plan: dict[str, Any]) -> str:
     recs = plan.get("recommendations")
     if isinstance(recs, list):
-        lines = [str(item).strip() for item in recs if str(item).strip()]
+        # Solo tomar las primeras 3 recomendaciones (agua, sueño, ejercicio)
+        lines = [str(item).strip() for item in recs[:3] if str(item).strip()]
         if lines:
-            return " ".join(lines)
+            text = " ".join(lines)
+            # Truncar a 350 chars máximo
+            if len(text) > 350:
+                text = text[:350].rsplit(" ", 1)[0]
+            return text
     if isinstance(recs, str) and recs.strip():
-        return recs.strip()
+        text = recs.strip()[:350]
+        return text
     return (
-        "Consumir entre 8 y 10 vasos de agua al día y dormir de 7 a 8 horas. "
-        "Aderezos permitidos: limón, sal y aceite de oliva virgen."
+        "Hidratación: beber agua constante durante el día según peso y actividad. "
+        "Actividad física: ejercicio regular adaptado a objetivo. "
+        "Descanso: dormir 7-8 horas diarias."
     )
 
 
@@ -355,7 +368,7 @@ def render_official_diet_export_html(
 
 
 def _browser_bin() -> Optional[str]:
-    for candidate in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+    for candidate in ("google-chrome", "google-chrome-stable", "chromium-browser", "chromium"):
         found = shutil.which(candidate)
         if found:
             return found

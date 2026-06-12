@@ -4,6 +4,8 @@ import MealCard from "./MealCard"
 type Props = {
   days: Record<string, unknown>[]
   mealSlots: string[]
+  editable?: boolean
+  onMealSave?: (dayIndex: number, slotKey: string, text: string) => void
 }
 
 const SLOT_LABELS_ES: Record<string, string> = {
@@ -14,7 +16,7 @@ const SLOT_LABELS_ES: Record<string, string> = {
   dinner: "🍽️ Cena",
 }
 
-export default function MealDayAccordion({ days, mealSlots }: Props) {
+export default function MealDayAccordion({ days, mealSlots, editable, onMealSave }: Props) {
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold text-gray-700">📅 Plan de Comidas</h3>
@@ -31,6 +33,10 @@ export default function MealDayAccordion({ days, mealSlots }: Props) {
                     key={slot}
                     label={SLOT_LABELS_ES[slot] || slot}
                     content={text}
+                    slotKey={slot}
+                    dayIndex={i}
+                    editable={editable}
+                    onSave={onMealSave ? (key, txt) => onMealSave(i, key, txt) : undefined}
                   />
                 )
               })}
