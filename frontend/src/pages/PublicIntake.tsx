@@ -2,6 +2,11 @@ import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "rea
 import { useParams } from "react-router-dom"
 import { submitIntakeForm, validateIntakeToken } from "../services/api"
 import type { IntakePublicMeta } from "../types"
+import DatePicker from "../components/ui/DatePicker"
+import NoAplicaField from "../components/ui/NoAplicaField"
+import WeightInput from "../components/ui/WeightInput"
+import HeightInput from "../components/ui/HeightInput"
+import { OBJECTIVE_OPTIONS } from "../constants/objectives"
 
 const COUNTRY_CITIES: Record<string, string[]> = {
   "República Dominicana": ["Santo Domingo", "Santiago", "La Romana", "San Pedro de Macorís", "Punta Cana"],
@@ -11,9 +16,6 @@ const COUNTRY_CITIES: Record<string, string[]> = {
   USA: ["Miami", "New York", "Los Angeles", "Houston", "Orlando"],
 }
 
-const WEIGHT_LB_TO_KG = 0.45359237
-const IN_TO_CM = 2.54
-
 export default function PublicIntake() {
   const { token } = useParams()
   const [meta, setMeta] = useState<IntakePublicMeta | null>(null)
@@ -21,8 +23,15 @@ export default function PublicIntake() {
   const [done, setDone] = useState(false)
   const [country, setCountry] = useState("")
   const [city, setCity] = useState("")
-  const [weightUnit, setWeightUnit] = useState<"kg" | "lb">("kg")
-  const [heightUnit, setHeightUnit] = useState<"cm" | "ftin">("cm")
+  const [birthDate, setBirthDate] = useState("")
+  const [diseases, setDiseases] = useState("")
+  const [medications, setMedications] = useState("")
+  const [foodAllergies, setFoodAllergies] = useState("")
+  const [foodsAvoided, setFoodsAvoided] = useState("")
+  const [medicalHistory, setMedicalHistory] = useState("")
+  const [weightKg, setWeightKg] = useState("")
+  const [heightCm, setHeightCm] = useState("")
+  const [objective, setObjective] = useState("")
 
   const cityOptions = useMemo(() => COUNTRY_CITIES[country] || [], [country])
 
@@ -57,42 +66,29 @@ export default function PublicIntake() {
       const n = Number(v)
       return Number.isFinite(n) ? n : null
     }
-    const weightRaw = Number(str("weight_value"))
-    const heightCmRaw = Number(str("height_cm_value"))
-    const heightFt = Number(str("height_ft_value"))
-    const heightIn = Number(str("height_in_value") || "0")
+    const weightKgNum = parseFloat(weightKg);
+    const heightCmNum = parseFloat(heightCm);
 
-    const weightKg =
-      Number.isFinite(weightRaw) && weightRaw > 0
-        ? weightUnit === "kg"
-          ? weightRaw
-          : weightRaw * WEIGHT_LB_TO_KG
-        : NaN
-
-    const heightCm =
-      heightUnit === "cm"
-        ? heightCmRaw
-        : Number.isFinite(heightFt) && heightFt > 0
-          ? (heightFt * 12 + (Number.isFinite(heightIn) ? heightIn : 0)) * IN_TO_CM
-          : NaN
+    const weight_kg = !isNaN(weightKgNum) && weightKgNum > 0 ? weightKgNum : NaN;
+    const height_cm = !isNaN(heightCmNum) && heightCmNum > 0 ? heightCmNum : NaN;
 
     const body: Record<string, unknown> = {
       first_name: str("first_name"),
       last_name: str("last_name"),
-      birth_date: str("birth_date"),
+      birth_date: birthDate,
       sex: str("sex"),
       country,
       city: city || str("city_other"),
-      objective: str("objective"),
-      food_allergies: str("food_allergies"),
-      foods_avoided: str("foods_avoided"),
-      weight_kg: weightKg,
-      height_cm: heightCm,
+      objective: objective,
+      food_allergies: foodAllergies === "No aplica" ? "No aplica" : foodAllergies,
+      foods_avoided: foodsAvoided === "No aplica" ? "No aplica" : foodsAvoided,
+      weight_kg: weight_kg,
+      height_cm: height_cm,
       whatsapp: optStr("whatsapp"),
       email: optStr("email") || null,
-      diseases: optStr("diseases"),
-      medications: optStr("medications"),
-      medical_history: optStr("medical_history"),
+      diseases: diseases === "No aplica" ? "No aplica" : diseases,
+      medications: medications === "No aplica" ? "No aplica" : medications,
+      medical_history: medicalHistory === "No aplica" ? "No aplica" : medicalHistory,
       dietary_style: optStr("dietary_style"),
       food_preferences: optStr("food_preferences"),
       disliked_foods: optStr("disliked_foods"),
@@ -189,7 +185,13 @@ export default function PublicIntake() {
         <label style={{ fontSize: 13 }}>Last name *</label>
         <input name="last_name" required style={input} />
         <label style={{ fontSize: 13 }}>Birth date *</label>
-        <input name="birth_date" type="date" required style={input} />
+        <DatePicker
+          value={birthDate}
+          onChange={setBirthDate}
+          name="birth_date"
+          placeholder="DD/MM/AAAA"
+          required
+        />
         <label style={{ fontSize: 13 }}>Sex *</label>
         <input name="sex" required placeholder="e.g. female / male" style={input} />
         <label style={{ fontSize: 13 }}>Email</label>
@@ -224,31 +226,10 @@ export default function PublicIntake() {
         )}
 
         <h2 style={{ fontSize: 16 }}>Measurements *</h2>
-        <label style={{ fontSize: 13 }}>Weight unit *</label>
-        <select value={weightUnit} onChange={(e) => setWeightUnit(e.target.value as "kg" | "lb")} style={input}>
-          <option value="kg">kg</option>
-          <option value="lb">lb</option>
-        </select>
-        <label style={{ fontSize: 13 }}>Weight ({weightUnit}) *</label>
-        <input name="weight_value" type="number" step="0.1" required style={input} />
-        <label style={{ fontSize: 13 }}>Height unit *</label>
-        <select value={heightUnit} onChange={(e) => setHeightUnit(e.target.value as "cm" | "ftin")} style={input}>
-          <option value="cm">cm</option>
-          <option value="ftin">feet + inches</option>
-        </select>
-        {heightUnit === "cm" ? (
-          <>
-            <label style={{ fontSize: 13 }}>Height (cm) *</label>
-            <input name="height_cm_value" type="number" step="0.1" required style={input} />
-          </>
-        ) : (
-          <>
-            <label style={{ fontSize: 13 }}>Height (feet) *</label>
-            <input name="height_ft_value" type="number" step="1" required style={input} />
-            <label style={{ fontSize: 13 }}>Height (inches)</label>
-            <input name="height_in_value" type="number" step="1" style={input} />
-          </>
-        )}
+        <label style={{ fontSize: 13 }}>Peso *</label>
+        <WeightInput valueKg={weightKg} onChangeKg={setWeightKg} name="weight_kg" required />
+        <label style={{ fontSize: 13, marginTop: 10 }}>Estatura *</label>
+        <HeightInput valueCm={heightCm} onChangeCm={setHeightCm} name="height_cm" required />
         <label style={{ fontSize: 13 }}>Neck (cm)</label>
         <input name="neck_cm" type="number" step="0.1" style={input} />
         <label style={{ fontSize: 13 }}>Chest (cm)</label>
@@ -264,20 +245,50 @@ export default function PublicIntake() {
 
         <h2 style={{ fontSize: 16 }}>Goals & health</h2>
         <label style={{ fontSize: 13 }}>Main objective *</label>
-        <input name="objective" required placeholder="e.g. lose_weight" style={input} />
-        <label style={{ fontSize: 13 }}>Diseases / diagnoses</label>
-        <textarea name="diseases" rows={2} style={{ ...input, minHeight: 48 }} />
-        <label style={{ fontSize: 13 }}>Medications</label>
-        <textarea name="medications" rows={2} style={{ ...input, minHeight: 48 }} />
-        <label style={{ fontSize: 13 }}>Food allergies * (or &quot;none&quot;)</label>
-        <input name="food_allergies" required style={input} />
-        <label style={{ fontSize: 13 }}>Foods avoided * (or &quot;none&quot;)</label>
-        <input name="foods_avoided" required style={input} />
-        <label style={{ fontSize: 13 }}>Medical history</label>
-        <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
-          Include diagnoses, surgeries, relevant events and current follow-up.
-        </p>
-        <textarea name="medical_history" rows={2} style={{ ...input, minHeight: 48 }} />
+        <select name="objective" value={objective} onChange={(e) => setObjective(e.target.value)} required style={input}>
+          {OBJECTIVE_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        <NoAplicaField
+          label="Diseases / diagnoses"
+          value={diseases}
+          onChange={setDiseases}
+          name="diseases"
+          placeholder="Ej. Diabetes tipo 2, Hipertensión"
+        />
+        <NoAplicaField
+          label="Medications"
+          value={medications}
+          onChange={setMedications}
+          name="medications"
+          placeholder="Ej. Metformina 500mg, Losartán 50mg"
+        />
+        <NoAplicaField
+          label="Food allergies"
+          value={foodAllergies}
+          onChange={setFoodAllergies}
+          name="food_allergies"
+          type="input"
+          placeholder="Ej. Gluten, lactosa"
+        />
+        <NoAplicaField
+          label="Foods avoided"
+          value={foodsAvoided}
+          onChange={setFoodsAvoided}
+          name="foods_avoided"
+          type="input"
+          placeholder="Ej. Lácteos, gluten"
+        />
+        <NoAplicaField
+          label="Medical history"
+          value={medicalHistory}
+          onChange={setMedicalHistory}
+          name="medical_history"
+          placeholder="Include diagnoses, surgeries, relevant events and current follow-up."
+        />
         <label style={{ fontSize: 13 }}>Dietary style</label>
         <input name="dietary_style" style={input} />
         <label style={{ fontSize: 13 }}>Foods you like</label>
