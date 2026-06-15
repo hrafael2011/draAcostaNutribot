@@ -4,6 +4,17 @@ import MealDayAccordion from "./MealDayAccordion"
 import DietActions from "./DietActions"
 import { useDietGeneration } from "../../hooks/useDietGeneration"
 
+const CLINICAL_RULE_LABELS: Record<string, string> = {
+  diabetes_carb_distribution_low_gi:
+    "🩸 Diabetes: Distribución de carbohidratos, priorizando bajo índice glucémico",
+  hypertension_sodium_moderation:
+    "❤️ Hipertensión: Moderación de sodio, patrón tipo DASH",
+  renal_protein_ceiling_applied:
+    "🫘 Condición renal: Tope conservador de proteína — individualizar con nefrología",
+  dyslipidemia_reduced_fat_fraction:
+    "🩺 Dislipidemia: Límite de grasas saturadas y trans, favorecer grasas insaturadas y fibra",
+}
+
 type Props = {
   diet: Diet
   editable?: boolean
@@ -48,13 +59,17 @@ export default function DietPreviewPanel({ diet, editable, onMealSave, onToggleE
       {/* Nutrition engine */}
       <NutritionSummary diet={diet} />
 
-      {/* Clinical rules */}
+      {/* Clinical rules — human-readable labels */}
       {Array.isArray(plan.clinical_rules_applied) && plan.clinical_rules_applied.length > 0 && (
-        <div className="rounded-lg border border-gray-200 p-3">
-          <p className="text-xs font-semibold text-gray-600 mb-1">Reglas clínicas aplicadas:</p>
-          {(plan.clinical_rules_applied as string[]).map((r, i) => (
-            <p key={i} className="text-xs text-gray-500">• {r}</p>
-          ))}
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+          <p className="text-xs font-semibold text-emerald-800 mb-2">🧬 Reglas clínicas aplicadas:</p>
+          <div className="space-y-1.5">
+            {(plan.clinical_rules_applied as string[]).map((r) => (
+              <p key={r} className="text-xs text-emerald-700">
+                {CLINICAL_RULE_LABELS[r] || `• ${r}`}
+              </p>
+            ))}
+          </div>
         </div>
       )}
 

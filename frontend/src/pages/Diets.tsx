@@ -309,6 +309,7 @@ export default function Diets() {
             </label>
             <DurationPresetButtons
               presets={durationPresets}
+              value={Number(genDuration) || undefined}
               onSelect={(d) => setGenDuration(String(d))}
             />
             <input
