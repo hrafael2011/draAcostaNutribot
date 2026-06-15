@@ -478,9 +478,8 @@ export default function PatientDrawer({ open, onClose, onCreated }: PatientDrawe
                         animate={{ height: "auto", opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.25, ease: "easeInOut" }}
-                        className="overflow-hidden"
                       >
-                        <div className="grid grid-cols-2 gap-4 pt-4">
+                        <div className="space-y-4 pt-4">
                           <div>
                             <label className={LABEL_CLASS}>Peso</label>
                             <WeightInput
