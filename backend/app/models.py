@@ -56,6 +56,7 @@ class Patient(Base):
     source = Column(String(20), nullable=False, default="admin")
     is_active = Column(Boolean, default=True, nullable=False)
     is_archived = Column(Boolean, default=False, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
@@ -151,6 +152,7 @@ class Diet(Base):
     id = Column(Integer, primary_key=True, index=True)
     patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
     doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     status = Column(String(20), nullable=False, default="draft")
     title = Column(String(160), nullable=True)
     summary = Column(Text, nullable=True)
