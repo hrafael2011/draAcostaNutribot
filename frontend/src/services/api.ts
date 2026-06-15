@@ -387,7 +387,7 @@ export function regenerateDiet(
   }).then((r) => parseJson<Diet>(r))
 }
 
-export async function downloadDietPdf(id: number) {
+export async function getDietPdfBlob(id: number): Promise<Blob> {
   const token = getStoredToken()
   const res = await fetch(`${API_BASE_URL}/diets/${id}/pdf`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -395,7 +395,11 @@ export async function downloadDietPdf(id: number) {
   if (!res.ok) {
     throw new Error(await readApiError(res))
   }
-  const blob = await res.blob()
+  return res.blob()
+}
+
+export async function downloadDietPdf(id: number) {
+  const blob = await getDietPdfBlob(id)
   const url = URL.createObjectURL(blob)
   const a = document.createElement("a")
   a.href = url

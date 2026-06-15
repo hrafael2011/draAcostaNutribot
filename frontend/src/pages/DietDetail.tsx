@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { Link, useParams } from "react-router-dom"
-import { downloadDietPdf, getDiet } from "../services/api"
+import { downloadDietPdf, getDiet, getDietPdfBlob } from "../services/api"
 import type { Diet } from "../types"
 import DietPreviewPanel from "../components/diet/DietPreviewPanel"
 import GenerationOverlay from "../components/ui/GenerationOverlay"
@@ -42,6 +42,36 @@ export default function DietDetail() {
       await downloadDietPdf(diet.id)
     } catch (err: unknown) {
       addToast(err instanceof Error ? err.message : "Error al descargar PDF", "error")
+    } finally {
+      setPdfLoading(false)
+    }
+  }
+
+  const handleSharePdf = async () => {
+    if (!diet) return
+    setPdfLoading(true)
+    try {
+      const blob = await getDietPdfBlob(diet.id)
+      const file = new File([blob], `dieta-${diet.id}.pdf`, { type: "application/pdf" })
+      if (navigator.share && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Dieta - ${diet.title || "Plan Nutricional"}`,
+        })
+      } else {
+        // Fallback: download if Web Share API doesn't support files
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `dieta-${diet.id}.pdf`
+        a.click()
+        URL.revokeObjectURL(url)
+      }
+    } catch (err: unknown) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return
+      }
+      addToast(err instanceof Error ? err.message : "Error al compartir PDF", "error")
     } finally {
       setPdfLoading(false)
     }
@@ -142,6 +172,7 @@ export default function DietDetail() {
           )
         }}
         onDownloadPdf={handleDownloadPdf}
+        onSharePdf={handleSharePdf}
       />
       <GenerationOverlay
         open={pdfLoading}

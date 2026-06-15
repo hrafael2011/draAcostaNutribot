@@ -12,9 +12,10 @@ type Props = {
   onApprove?: () => void
   onDiscard?: () => void
   onDownloadPdf?: () => void
+  onSharePdf?: () => void
 }
 
-export default function DietPreviewPanel({ diet, editable, onMealSave, onToggleEdit, onApprove, onDiscard, onDownloadPdf }: Props) {
+export default function DietPreviewPanel({ diet, editable, onMealSave, onToggleEdit, onApprove, onDiscard, onDownloadPdf, onSharePdf }: Props) {
   const plan = diet.structured_plan_json
   const days = Array.isArray(plan.days) ? (plan.days as Record<string, unknown>[]) : []
   const mealSlots = Array.isArray(plan.meal_slots) ? (plan.meal_slots as string[]) : []
@@ -74,6 +75,7 @@ export default function DietPreviewPanel({ diet, editable, onMealSave, onToggleE
             import("../../services/api").then(({ downloadDietPdf }) => downloadDietPdf(diet.id))
           }
         }}
+        onSharePdf={onSharePdf}
         onToggleEdit={onToggleEdit}
         editing={editable}
         loading={loading}

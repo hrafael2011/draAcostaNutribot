@@ -1,4 +1,4 @@
-import { PencilSimple } from "@phosphor-icons/react"
+import { PencilSimple, Share } from "@phosphor-icons/react"
 import Button from "../ui/Button"
 import QuickAdjustMenu from "./QuickAdjustMenu"
 import { useState } from "react"
@@ -10,6 +10,7 @@ type Props = {
   onDiscard: () => void
   onQuickAdjust: (key: string, label: string) => void
   onDownloadPdf: () => void
+  onSharePdf?: () => void
   onToggleEdit?: () => void
   editing?: boolean
   loading: boolean
@@ -22,6 +23,7 @@ export default function DietActions({
   onDiscard,
   onQuickAdjust,
   onDownloadPdf,
+  onSharePdf,
   onToggleEdit,
   editing,
   loading,
@@ -62,6 +64,18 @@ export default function DietActions({
         <Button onClick={onDownloadPdf} className="w-full">
           📄 Descargar PDF
         </Button>
+        {onSharePdf && (
+          <Button
+            variant="secondary"
+            onClick={onSharePdf}
+            className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50"
+          >
+            <span className="flex items-center justify-center gap-1.5">
+              <Share size={14} />
+              Compartir PDF
+            </span>
+          </Button>
+        )}
         <Button variant="ghost" onClick={onToggleEdit} className="w-full text-sm">
           <span className="flex items-center justify-center gap-1.5">
             <PencilSimple size={14} />
