@@ -189,7 +189,7 @@ export default function PublicIntake() {
             <img
               src="/logo-doctora.jpeg"
               alt="Dra. Acosta"
-              className="h-16 w-auto mx-auto mb-4 object-contain"
+              className="h-24 w-auto mx-auto mb-4 object-contain"
             />
             <h1 className="text-xl font-bold text-emerald-800 mb-2">
               {linkType === "register" ? "¡Registro completado!" : "¡Datos actualizados!"}
@@ -218,7 +218,7 @@ export default function PublicIntake() {
                 <img
                   src="/logo-doctora.jpeg"
                   alt="Dra. Acosta"
-                  className="h-20 w-auto mx-auto mb-4 object-contain"
+                  className="h-28 w-auto mx-auto mb-4 object-contain"
                 />
                 <h1 className="text-2xl font-bold text-slate-900">
                   {linkType === "register" ? "Registro de Paciente" : "Actualizar Datos"}
