@@ -188,7 +188,7 @@ export default function IntakeLinks() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Page header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <span className="rounded-xl bg-emerald-100 text-emerald-700 p-2.5">
             <LinkSimple size={24} weight="duotone" />
@@ -214,7 +214,7 @@ export default function IntakeLinks() {
           {showFormDropdown && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowFormDropdown(false)} />
-              <div className="absolute left-0 top-full mt-2 z-50 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 overflow-hidden">
+              <div className="absolute right-0 sm:left-0 top-full mt-2 z-50 w-64 sm:w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 overflow-hidden">
                 <button
                   type="button"
                   onClick={() => { setShowFormDropdown(false); handleCreateRegisterLink(); }}
@@ -248,7 +248,7 @@ export default function IntakeLinks() {
       {creating && (
         <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-slate-700 mb-3">Seleccionar paciente</h3>
-          <div className="flex items-end gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
             <div className="flex-1">
               <label htmlFor="new-form-patient" className="block text-xs font-medium text-slate-500 mb-1.5">
                 Paciente
@@ -274,14 +274,14 @@ export default function IntakeLinks() {
               type="button"
               onClick={handleConfirmCreate}
               disabled={selectedPatientId === ""}
-              className="rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full sm:w-auto rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Continuar
             </button>
             <button
               type="button"
               onClick={handleCancelCreate}
-              className="rounded-full border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+              className="w-full sm:w-auto rounded-full border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
             >
               Cancelar
             </button>
@@ -340,34 +340,34 @@ export default function IntakeLinks() {
                 key={link.id}
                 className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-4 gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <Avatar firstName={p?.first_name} lastName={p?.last_name} size="md" />
-                    <div>
+                    <div className="min-w-0">
                       {p ? (
                         <Link
                           to={`/patients/${p.id}`}
-                          className="text-sm font-semibold text-slate-800 hover:text-emerald-600 transition-colors"
+                          className="text-sm font-semibold text-slate-800 hover:text-emerald-600 transition-colors truncate block"
                         >
                           {name}
                         </Link>
                       ) : (
                         <span className="text-sm font-semibold text-slate-500">{name}</span>
                       )}
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant={badge.variant}>{badge.label}</Badge>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          link.link_type === "register"
-                            ? "bg-emerald-50 text-emerald-700"
-                            : "bg-blue-50 text-blue-700"
-                        }`}>
-                          {link.link_type === "register" ? "📝 Registro" : "🔄 Actualización"}
-                        </span>
-                        <span className="text-xs text-slate-400">
-                          {link.use_count}/{link.max_uses} usos
-                        </span>
-                      </div>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={badge.variant}>{badge.label}</Badge>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      link.link_type === "register"
+                        ? "bg-emerald-50 text-emerald-700"
+                        : "bg-blue-50 text-blue-700"
+                    }`}>
+                      {link.link_type === "register" ? "📝 Registro" : "🔄 Actualización"}
+                    </span>
+                    <span className="text-xs text-slate-400">
+                      {link.use_count}/{link.max_uses} usos
+                    </span>
                   </div>
                 </div>
 
@@ -382,7 +382,7 @@ export default function IntakeLinks() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="text-xs text-slate-400 truncate font-mono">
                       {truncatedUrl(link.token)}
