@@ -67,7 +67,7 @@ async def list_patients(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=500),
 ):
-    conditions = [Patient.doctor_id == doctor.id]
+    conditions = [Patient.doctor_id == doctor.id, Patient.deleted_at.is_(None)]
     if status_filter == "archived":
         conditions.append(Patient.is_archived.is_(True))
     elif status_filter == "active":
@@ -321,3 +321,53 @@ async def patient_summary(
         ),
         latest_diet=latest_diet_out,
     )
+
+
+@router.post("/{patient_id}/soft-delete")
+async def soft_delete_patient(
+    patient_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    patient = await _get_patient_for_doctor(db, doctor.id, patient_id)
+    patient.deleted_at = utcnow()
+    # Also soft-delete all active diets for this patient
+    diets_q = select(Diet).where(
+        Diet.patient_id == patient_id, Diet.deleted_at.is_(None)
+    )
+    diets = (await db.execute(diets_q)).scalars().all()
+    for d in diets:
+        d.deleted_at = patient.deleted_at
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/{patient_id}/restore")
+async def restore_patient(
+    patient_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    patient = await _get_patient_for_doctor(db, doctor.id, patient_id)
+    patient.deleted_at = None
+    # Restore all soft-deleted diets for this patient
+    diets_q = select(Diet).where(
+        Diet.patient_id == patient_id, Diet.deleted_at.isnot(None)
+    )
+    diets = (await db.execute(diets_q)).scalars().all()
+    for d in diets:
+        d.deleted_at = None
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/{patient_id}/hard-delete")
+async def hard_delete_patient(
+    patient_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    patient = await _get_patient_for_doctor(db, doctor.id, patient_id)
+    await db.delete(patient)
+    await db.commit()
+    return {"ok": True}

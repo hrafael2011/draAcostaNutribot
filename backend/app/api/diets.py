@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_doctor
 from app.core.database import get_db
 from app.logic.diet_duration import QUICK_PLAN_DURATION_DAYS
-from app.models import Diet, DietVersion, Doctor, Patient, PatientMetrics, PatientProfile
+from app.models import Diet, DietVersion, Doctor, Patient, PatientMetrics, PatientProfile, utcnow
 from app.schemas import (
     DietGenerateRequest,
     DietMealsUpdateRequest,
@@ -71,7 +71,7 @@ async def list_diets(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
-    conditions = [Diet.doctor_id == doctor.id]
+    conditions = [Diet.doctor_id == doctor.id, Diet.deleted_at.is_(None)]
     if patient_id is not None:
         conditions.append(Diet.patient_id == patient_id)
     if status_filter:
@@ -341,3 +341,45 @@ async def get_diet_pdf(
             "Content-Disposition": f'attachment; filename="diet_{diet_id}.pdf"'
         },
     )
+
+
+@router.post("/{diet_id}/soft-delete")
+async def soft_delete_diet(
+    diet_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    diet = await db.get(Diet, diet_id)
+    if diet is None or diet.doctor_id != doctor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+    diet.deleted_at = utcnow()
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/{diet_id}/restore")
+async def restore_diet(
+    diet_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    diet = await db.get(Diet, diet_id)
+    if diet is None or diet.doctor_id != doctor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+    diet.deleted_at = None
+    await db.commit()
+    return {"ok": True}
+
+
+@router.delete("/{diet_id}/hard-delete")
+async def hard_delete_diet(
+    diet_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    diet = await db.get(Diet, diet_id)
+    if diet is None or diet.doctor_id != doctor.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+    await db.delete(diet)
+    await db.commit()
+    return {"ok": True}

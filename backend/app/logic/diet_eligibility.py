@@ -10,6 +10,8 @@ def diet_generation_blockers(
     latest: Optional[PatientMetrics],
 ) -> List[str]:
     reasons: List[str] = []
+    if patient.deleted_at:
+        reasons.append("El paciente ha sido eliminado")
     if not patient.birth_date:
         reasons.append("Missing patient birth_date")
     if not patient.sex:
