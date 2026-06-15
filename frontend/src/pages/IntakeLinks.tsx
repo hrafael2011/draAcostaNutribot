@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { LinkSimple, Plus, Copy, Trash } from "@phosphor-icons/react"
+import { LinkSimple, Plus, Copy, Trash, CaretDown } from "@phosphor-icons/react"
 import { getIntakeLinks, getPatients, revokeIntakeLink } from "../services/api"
 import { Avatar } from "../components/ui/Avatar"
 import { Badge } from "../components/ui/Badge"
@@ -27,6 +27,7 @@ export default function IntakeLinks() {
   // "New form" creation flow
   const [creating, setCreating] = useState(false)
   const [selectedPatientId, setSelectedPatientId] = useState<number | "">("")
+  const [showFormDropdown, setShowFormDropdown] = useState(false)
 
   const patientById = useMemo(() => {
     const m = new Map<number, Patient>()
@@ -199,23 +200,47 @@ export default function IntakeLinks() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="relative">
           <button
             type="button"
-            onClick={handleStartCreate}
+            onClick={() => setShowFormDropdown(!showFormDropdown)}
             className="flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
           >
             <Plus size={18} weight="bold" />
             Nuevo Formulario
+            <CaretDown size={14} weight="bold" className={`transition-transform ${showFormDropdown ? "rotate-180" : ""}`} />
           </button>
-          <button
-            type="button"
-            onClick={handleCreateRegisterLink}
-            className="flex items-center gap-2 rounded-full bg-white border-2 border-emerald-500 text-emerald-700 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
-          >
-            <Plus size={18} weight="bold" />
-            Registro Rápido
-          </button>
+
+          {showFormDropdown && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowFormDropdown(false)} />
+              <div className="absolute left-0 top-full mt-2 z-50 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => { setShowFormDropdown(false); handleCreateRegisterLink(); }}
+                  className="flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-emerald-50 transition-colors"
+                >
+                  <span className="text-xl mt-0.5">📝</span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Registro</p>
+                    <p className="text-xs text-slate-500">Para paciente nuevo — se crea automáticamente</p>
+                  </div>
+                </button>
+                <div className="border-t border-slate-100" />
+                <button
+                  type="button"
+                  onClick={() => { setShowFormDropdown(false); handleStartCreate(); }}
+                  className="flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-emerald-50 transition-colors"
+                >
+                  <span className="text-xl mt-0.5">🔄</span>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">Actualización</p>
+                    <p className="text-xs text-slate-500">Para paciente existente — elige quién</p>
+                  </div>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
