@@ -6,6 +6,8 @@ import type {
   IntakePublicMeta,
   PaginatedDiets,
   PaginatedPatients,
+  PaginatedTrashDiets,
+  PaginatedTrashPatients,
   Patient,
   PatientMetric,
   PatientProfile,
@@ -426,6 +428,54 @@ export async function downloadDietExport(id: number, format: "txt" | "json") {
   a.download = `diet-${id}.${format === "json" ? "json" : "txt"}`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// ── Trash / Soft Delete ────────────────────────────────────────────
+
+export function getTrashPatients(search?: string, page?: number, pageSize?: number) {
+  const params = new URLSearchParams()
+  if (search) params.set("search", search)
+  if (page) params.set("page", String(page))
+  if (pageSize) params.set("page_size", String(pageSize))
+  const qs = params.toString()
+  return authFetch(`/trash/patients${qs ? "?" + qs : ""}`).then((r) =>
+    parseJson<PaginatedTrashPatients>(r),
+  )
+}
+
+export function getTrashDiets(search?: string, page?: number, pageSize?: number) {
+  const params = new URLSearchParams()
+  if (search) params.set("search", search)
+  if (page) params.set("page", String(page))
+  if (pageSize) params.set("page_size", String(pageSize))
+  const qs = params.toString()
+  return authFetch(`/trash/diets${qs ? "?" + qs : ""}`).then((r) =>
+    parseJson<PaginatedTrashDiets>(r),
+  )
+}
+
+export function softDeletePatient(patientId: number) {
+  return authFetch(`/patients/${patientId}/soft-delete`, { method: "POST" }).then((r) => r.json())
+}
+
+export function restorePatient(patientId: number) {
+  return authFetch(`/patients/${patientId}/restore`, { method: "POST" }).then((r) => r.json())
+}
+
+export function hardDeletePatient(patientId: number) {
+  return authFetch(`/patients/${patientId}/hard-delete`, { method: "DELETE" }).then((r) => r.json())
+}
+
+export function softDeleteDiet(dietId: number) {
+  return authFetch(`/diets/${dietId}/soft-delete`, { method: "POST" }).then((r) => r.json())
+}
+
+export function restoreDiet(dietId: number) {
+  return authFetch(`/diets/${dietId}/restore`, { method: "POST" }).then((r) => r.json())
+}
+
+export function hardDeleteDiet(dietId: number) {
+  return authFetch(`/diets/${dietId}/hard-delete`, { method: "DELETE" }).then((r) => r.json())
 }
 
 export function approveDiet(dietId: number) {

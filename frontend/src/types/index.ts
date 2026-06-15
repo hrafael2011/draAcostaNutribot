@@ -290,3 +290,35 @@ export function initialWizardState(patientId?: number): WizardState {
     parentDietId: null,
   }
 }
+
+// ── Trash / Soft Delete ──────────────────────────────────────────────
+
+export type TrashPatientItem = {
+  id: number
+  first_name: string
+  last_name: string
+  email: string | null
+  deleted_at: string
+}
+
+export type TrashDietItem = {
+  diet_id: number
+  patient_id: number
+  patient_name: string
+  title: string | null
+  deleted_at: string
+}
+
+export type PaginatedTrashPatients = {
+  items: TrashPatientItem[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export type PaginatedTrashDiets = {
+  items: TrashDietItem[]
+  total: number
+  page: number
+  page_size: number
+}
