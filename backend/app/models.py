@@ -132,7 +132,8 @@ class PatientIntakeLink(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     doctor_id = Column(Integer, ForeignKey("doctors.id"), nullable=False)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=True)
+    link_type = Column(String(20), nullable=False, default="register")
     token = Column(String(80), unique=True, nullable=False, index=True)
     status = Column(String(20), nullable=False, default="active")
     expires_at = Column(DateTime(timezone=True), nullable=False)
