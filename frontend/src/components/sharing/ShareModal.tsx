@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { X, Spinner, Check, Copy, Envelope, Share } from "@phosphor-icons/react"
+import { X, Spinner, Check, Copy, Share } from "@phosphor-icons/react"
 import { createIntakeLink } from "../../services/api"
 import { useToast } from "../../context/ToastContext"
 import type { IntakeLink } from "../../types"
@@ -217,7 +217,7 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                   </button>
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2">
                   <button
                     onClick={() => handleCopy(url)}
                     className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
@@ -228,24 +228,19 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                       <><Copy size={18} /><span>Copiar enlace</span></>
                     )}
                   </button>
-                  {hasWebShare ? (
-                    <button
-                      onClick={handleShare}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 text-emerald-700 px-4 py-3 text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
-                    >
-                      <Share size={18} />
-                      Compartir
-                    </button>
-                  ) : (
-                    <a
-                      href={emailLink}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-600 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 transition-colors shadow-sm"
-                    >
-                      <Envelope size={18} />
-                      Correo
-                    </a>
-                  )}
+                  <button
+                    onClick={hasWebShare ? handleShare : () => window.open(emailLink, "_blank")}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 text-emerald-700 px-4 py-3 text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
+                  >
+                    <Share size={18} />
+                    Compartir
+                  </button>
                 </div>
+                {!hasWebShare && (
+                  <p className="text-xs text-center text-slate-400">
+                    💡 En un móvil aparecerán más opciones como WhatsApp, Telegram, etc.
+                  </p>
+                )}
               </div>
             )}
           </motion.div>
