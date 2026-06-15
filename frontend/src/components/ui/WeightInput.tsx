@@ -46,7 +46,7 @@ export default function WeightInput({
   }
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 flex-wrap">
       <input
         type="number"
         step="0.1"

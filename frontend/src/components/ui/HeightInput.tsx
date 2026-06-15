@@ -80,7 +80,7 @@ export default function HeightInput({
           required={required}
         />
       ) : (
-        <div className="flex gap-1.5 flex-1">
+        <div className="flex gap-1.5 flex-1 flex-wrap">
           <input
             type="number"
             step="1"
