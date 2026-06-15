@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { DotsThree, User, BowlFood, Envelope, Pencil } from "@phosphor-icons/react";
+import { DotsThree, User, BowlFood, Trash, Pencil } from "@phosphor-icons/react";
 import { useState, useRef, useEffect } from "react";
 import { Avatar } from "../ui/Avatar";
 import { Badge } from "../ui/Badge";
@@ -8,7 +8,7 @@ import type { Patient, PatientSummary } from "../../types";
 type PatientRowProps = {
   patient: Patient;
   summary?: PatientSummary | null;
-  onShare?: (patient: Patient) => void;
+  onDelete?: (patient: Patient) => void;
 };
 
 function describeStatus(p: Patient, s?: PatientSummary | null): { label: string; variant: "success" | "warning" | "info" | "neutral" } {
@@ -24,7 +24,7 @@ function describeStatus(p: Patient, s?: PatientSummary | null): { label: string;
   return { label: "Sin dieta aún", variant: "info" };
 }
 
-export function PatientRow({ patient, summary, onShare }: PatientRowProps) {
+export function PatientRow({ patient, summary, onDelete }: PatientRowProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -69,8 +69,8 @@ export function PatientRow({ patient, summary, onShare }: PatientRowProps) {
             <Link to={`/diets/new?patient=${patient.id}`} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50" onClick={() => setMenuOpen(false)}>
               <BowlFood size={16} /> Nueva dieta
             </Link>
-            <button onClick={() => { setMenuOpen(false); onShare?.(patient); }} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 w-full text-left">
-              <Envelope size={16} /> Enviar formulario
+            <button onClick={() => { setMenuOpen(false); onDelete?.(patient); }} className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left">
+              <Trash size={16} /> Eliminar paciente
             </button>
             <Link to={`/patients/${patient.id}`} className="flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50" onClick={() => setMenuOpen(false)}>
               <Pencil size={16} /> Editar datos

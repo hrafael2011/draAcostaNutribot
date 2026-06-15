@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { X, Spinner, Check, Copy, WhatsappLogo, Envelope } from "@phosphor-icons/react"
+import { X, Spinner, Check, Copy, WhatsappLogo, Envelope, Share } from "@phosphor-icons/react"
 import { createIntakeLink } from "../../services/api"
 import { useToast } from "../../context/ToastContext"
 import type { IntakeLink } from "../../types"
@@ -33,6 +33,7 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const hasWebShare = typeof navigator !== "undefined" && !!navigator.share
   const { addToast } = useToast()
 
   const handleCreate = async () => {
@@ -62,6 +63,20 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
     }
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleShare = async () => {
+    if (!url) return
+    try {
+      await navigator.share({
+        title: "Completa tu ficha nutricional - Dra. Acosta",
+        text: "La Dra. Acosta te invita a completar tu ficha nutricional:",
+        url: url,
+      })
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return
+      addToast("Error al compartir", "error")
+    }
   }
 
   const url = link ? `${window.location.origin}/intake/${link.token}` : ""
@@ -187,23 +202,44 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                 </div>
 
                 <div className="flex gap-3">
-                  <a
-                    href={waLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-3 text-sm font-semibold text-white hover:bg-green-600 transition-colors shadow-sm"
+                  <button
+                    onClick={() => handleCopy(url)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
                   >
-                    <WhatsappLogo size={18} weight="fill" />
-                    WhatsApp
-                  </a>
-                  <a
-                    href={emailLink}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-600 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 transition-colors shadow-sm"
+                    {copied ? (
+                      <><Check size={18} /><span>¡Copiado!</span></>
+                    ) : (
+                      <><Copy size={18} /><span>Copiar enlace</span></>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 text-emerald-700 px-4 py-3 text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
                   >
-                    <Envelope size={18} />
-                    Correo
-                  </a>
+                    <Share size={18} />
+                    Compartir
+                  </button>
                 </div>
+                {!hasWebShare && (
+                  <div className="flex gap-3">
+                    <a
+                      href={waLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-3 text-sm font-semibold text-white hover:bg-green-600 transition-colors shadow-sm"
+                    >
+                      <WhatsappLogo size={18} weight="fill" />
+                      WhatsApp
+                    </a>
+                    <a
+                      href={emailLink}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-600 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 transition-colors shadow-sm"
+                    >
+                      <Envelope size={18} />
+                      Correo
+                    </a>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>

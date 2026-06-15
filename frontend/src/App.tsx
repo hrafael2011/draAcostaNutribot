@@ -13,6 +13,7 @@ import DietDetail from "./pages/DietDetail"
 import DietWizard from "./pages/DietWizard"
 import PublicIntake from "./pages/PublicIntake"
 import NotFound from "./pages/NotFound"
+import Trash from "./pages/Trash"
 
 export default function App() {
   return (
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="diets/:dietId/regenerate" element={<DietWizard />} />
         <Route path="diets" element={<Diets />} />
         <Route path="diets/:dietId" element={<DietDetail />} />
+        <Route path="trash" element={<Trash />} />
         <Route path="admin/users" element={<AdminUsers />} />
       </Route>
       <Route path="*" element={<NotFound />} />

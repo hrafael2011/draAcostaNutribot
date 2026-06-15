@@ -1,14 +1,15 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { BowlFood, CaretDown, MagnifyingGlass, Plus, X, Spinner } from "@phosphor-icons/react"
+import { BowlFood, CaretDown, MagnifyingGlass, Plus, Trash, X, Spinner } from "@phosphor-icons/react"
 import GenerationOverlay from "../components/ui/GenerationOverlay"
-import { generateDiet, getDiets, getPatients, getPlanDurationPresets } from "../services/api"
+import { generateDiet, getDiets, getPatients, getPlanDurationPresets, softDeleteDiet } from "../services/api"
 import type { Diet, PaginatedDiets } from "../types"
 import type { DietStrategyMode, MealsPerDay } from "../types"
 import { DurationPresetButtons } from "../components/DurationPresetButtons"
 import { Avatar } from "../components/ui/Avatar"
 import { SkeletonRow } from "../components/ui/Skeleton"
 import { EmptyState } from "../components/ui/EmptyState"
+import { useToast } from "../context/ToastContext"
 import { usePatientSearch } from "../hooks/usePatientSearch"
 import {
   clampDurationDays,
@@ -83,6 +84,20 @@ export default function Diets() {
   const [durationPresets, setDurationPresets] = useState<number[]>(() => [
     ...FALLBACK_PLAN_DURATION_PRESETS,
   ])
+  const { addToast } = useToast()
+
+  const handleDeleteDiet = async (e: React.MouseEvent, dietId: number, patientName: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!window.confirm(`¿Eliminar la dieta de ${patientName}? Se moverá a la papelera.`)) return
+    try {
+      await softDeleteDiet(dietId)
+      addToast("Dieta movida a la papelera", "success")
+      load()
+    } catch {
+      addToast("Error al eliminar dieta", "error")
+    }
+  }
 
   /* ---------- patient search hooks ---------- */
   const {
@@ -671,6 +686,13 @@ export default function Diets() {
                       {formatDate(d.created_at)} · {days} días
                     </p>
                   </div>
+                  <button
+                    onClick={(e) => handleDeleteDiet(e, d.id, name ? `${name.firstName} ${name.lastName}` : `#${d.patient_id}`)}
+                    className="p-1.5 rounded-lg text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all shrink-0 opacity-0 group-hover:opacity-100"
+                    title="Eliminar dieta"
+                  >
+                    <Trash size={16} />
+                  </button>
                   <span className="text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0">
                     &rarr;
                   </span>

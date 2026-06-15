@@ -4,7 +4,7 @@ import { PatientRow } from "../components/patients/PatientRow"
 import PatientDrawer from "../components/patients/PatientDrawer"
 import { SkeletonRow } from "../components/ui/Skeleton"
 import { EmptyState } from "../components/ui/EmptyState"
-import { getPatients, getPatientSummary } from "../services/api"
+import { getPatients, getPatientSummary, softDeletePatient } from "../services/api"
 import { useToast } from "../context/ToastContext"
 import type { PaginatedPatients, Patient, PatientSummary } from "../types"
 
@@ -76,8 +76,15 @@ export default function Patients() {
     setPage(1)
   }
 
-  const handleShare = (_patient: Patient) => {
-    addToast("Compartir: funcionalidad próximamente", "info")
+  const handleDelete = async (patient: Patient) => {
+    if (!window.confirm(`¿Eliminar a ${patient.first_name} ${patient.last_name}? Se moverá a la papelera.`)) return
+    try {
+      await softDeletePatient(patient.id)
+      addToast("Paciente movido a la papelera", "success")
+      load()
+    } catch {
+      addToast("Error al eliminar paciente", "error")
+    }
   }
 
   const handleCreated = () => {
@@ -179,7 +186,7 @@ export default function Patients() {
                 key={p.id}
                 patient={p}
                 summary={summaries[p.id]}
-                onShare={handleShare}
+                onDelete={handleDelete}
               />
             ))}
           </div>

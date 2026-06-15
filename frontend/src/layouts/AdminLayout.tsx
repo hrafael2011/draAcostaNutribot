@@ -10,6 +10,7 @@ import {
   SignOut,
   List,
   X,
+  Trash,
   CaretRight,
   type Icon,
 } from "@phosphor-icons/react"
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { to: "/patients", label: "Pacientes", icon: Users },
   { to: "/diets", label: "Dietas", icon: BowlFood },
   { to: "/formularios", label: "Formularios", icon: LinkSimple },
+  { to: "/trash", label: "Papelera", icon: Trash },
 ]
 
 const ADMIN_ITEM = { to: "/admin/users", label: "Administración", icon: Gear }
@@ -37,6 +39,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   formularios: "Formularios",
   "intake-links": "Formularios",
   "admin/users": "Administración",
+  trash: "Papelera",
 }
 
 function getBreadcrumbs(pathname: string) {
