@@ -91,7 +91,8 @@ export type DashboardSummary = {
 export type IntakeLink = {
   id: number
   doctor_id: number
-  patient_id: number
+  patient_id: number | null
+  link_type: string
   token: string
   status: string
   expires_at: string
@@ -103,6 +104,7 @@ export type IntakeLink = {
 
 export type IntakePublicMeta = {
   valid: boolean
+  link_type?: string | null
   expires_at?: string | null
   patient_first_name?: string | null
   patient_last_name?: string | null

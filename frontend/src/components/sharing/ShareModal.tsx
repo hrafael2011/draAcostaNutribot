@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { X, Spinner, Check, Copy, WhatsappLogo, Envelope, Share } from "@phosphor-icons/react"
+import { X, Spinner, Check, Copy, Envelope, Share } from "@phosphor-icons/react"
 import { createIntakeLink } from "../../services/api"
 import { useToast } from "../../context/ToastContext"
 import type { IntakeLink } from "../../types"
@@ -8,16 +8,14 @@ import type { IntakeLink } from "../../types"
 type ShareModalProps = {
   open: boolean
   onClose: () => void
-  patientId: number
-  patientName: string
+  patientId?: number
+  patientName?: string
 }
 
-const MESSAGES = {
-  wa: "Hola%2C%20la%20Dra.%20Acosta%20te%20invita%20a%20completar%20tu%20ficha%20nutricional%20para%20tu%20plan%20personalizado%3A",
-  emailSubject: "Completa tu ficha nutricional - Dra. Acosta",
-  emailBody:
-    "Hola,%0D%0A%0D%0ALa Dra. Acosta te comparte este link para que completes tu información nutricional y así preparar tu plan personalizado:%0D%0A%0D%0A",
-}
+const EMAIL_SUBJECT = encodeURIComponent("Completa tu ficha nutricional - Dra. Acosta")
+const EMAIL_BODY = encodeURIComponent(
+  "Hola,\n\nLa Dra. Acosta te comparte este link para que completes tu información nutricional:\n\n",
+)
 
 const EXPIRATION_OPTIONS = [
   { value: 1, label: "1 día" },
@@ -29,6 +27,7 @@ const EXPIRATION_OPTIONS = [
 
 export default function ShareModal({ open, onClose, patientId, patientName }: ShareModalProps) {
   const [link, setLink] = useState<IntakeLink | null>(null)
+  const [linkType, setLinkType] = useState<"register" | "update">("register")
   const [selectedDays, setSelectedDays] = useState(7)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -40,7 +39,11 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
     setLoading(true)
     setError(null)
     try {
-      const result = await createIntakeLink({ patient_id: patientId, expires_in_days: selectedDays })
+      const result = await createIntakeLink({
+        patient_id: linkType === "update" ? patientId : undefined,
+        link_type: linkType,
+        expires_in_days: selectedDays,
+      })
       setLink(result)
       addToast("Formulario creado exitosamente", "success")
     } catch (e) {
@@ -80,8 +83,7 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
   }
 
   const url = link ? `${window.location.origin}/intake/${link.token}` : ""
-  const waLink = `https://wa.me/?text=${MESSAGES.wa}%0A%0A${encodeURIComponent(url)}`
-  const emailLink = `mailto:?subject=${encodeURIComponent(MESSAGES.emailSubject)}&body=${MESSAGES.emailBody}${encodeURIComponent(url)}`
+  const emailLink = `mailto:?subject=${EMAIL_SUBJECT}&body=${EMAIL_BODY}${encodeURIComponent(url)}`
 
   return (
     <AnimatePresence>
@@ -103,7 +105,7 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-6 pb-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                Enviar Formulario a {patientName}
+                {patientName ? `Enviar Formulario a ${patientName}` : "Nuevo Formulario de Registro"}
               </h2>
               <button
                 type="button"
@@ -120,6 +122,20 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                 <p className="text-sm text-gray-600 leading-relaxed">
                   El paciente podrá llenar sus datos personales, historial médico, medidas corporales y preferencias alimentarias.
                 </p>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Tipo de formulario
+                  </label>
+                  <select
+                    value={linkType}
+                    onChange={(e) => setLinkType(e.target.value as "register" | "update")}
+                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  >
+                    <option value="register">📝 Registro — nuevo paciente</option>
+                    <option value="update" disabled={!patientId}>🔄 Actualización — paciente existente</option>
+                  </select>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -212,25 +228,15 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                       <><Copy size={18} /><span>Copiar enlace</span></>
                     )}
                   </button>
-                  <button
-                    onClick={handleShare}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 text-emerald-700 px-4 py-3 text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
-                  >
-                    <Share size={18} />
-                    Compartir
-                  </button>
-                </div>
-                {!hasWebShare && (
-                  <div className="flex gap-3">
-                    <a
-                      href={waLink}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-3 text-sm font-semibold text-white hover:bg-green-600 transition-colors shadow-sm"
+                  {hasWebShare ? (
+                    <button
+                      onClick={handleShare}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 text-emerald-700 px-4 py-3 text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
                     >
-                      <WhatsappLogo size={18} weight="fill" />
-                      WhatsApp
-                    </a>
+                      <Share size={18} />
+                      Compartir
+                    </button>
+                  ) : (
                     <a
                       href={emailLink}
                       className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-gray-600 px-4 py-3 text-sm font-semibold text-white hover:bg-gray-700 transition-colors shadow-sm"
@@ -238,8 +244,8 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                       <Envelope size={18} />
                       Correo
                     </a>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             )}
           </motion.div>

@@ -91,6 +91,12 @@ export default function IntakeLinks() {
     setCreating(true)
   }
 
+  function handleCreateRegisterLink() {
+    setSharePatientId(0)
+    setSharePatientName("")
+    setShareModalOpen(true)
+  }
+
   function handleCancelCreate() {
     setCreating(false)
     setSelectedPatientId("")
@@ -193,14 +199,24 @@ export default function IntakeLinks() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={handleStartCreate}
-          className="flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
-        >
-          <Plus size={18} weight="bold" />
-          Nuevo Formulario
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleStartCreate}
+            className="flex items-center gap-2 rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <Plus size={18} weight="bold" />
+            Nuevo Formulario
+          </button>
+          <button
+            type="button"
+            onClick={handleCreateRegisterLink}
+            className="flex items-center gap-2 rounded-full bg-white border-2 border-emerald-500 text-emerald-700 px-5 py-2.5 text-sm font-semibold hover:bg-emerald-50 transition-colors shadow-sm"
+          >
+            <Plus size={18} weight="bold" />
+            Registro Rápido
+          </button>
+        </div>
       </div>
 
       {/* Patient selector for new form */}
@@ -288,8 +304,8 @@ export default function IntakeLinks() {
       {links.length > 0 && (
         <div className="space-y-3">
           {links.map((link) => {
-            const p = patientById.get(link.patient_id)
-            const name = p ? `${p.first_name} ${p.last_name}` : `#${link.patient_id}`
+            const p = link.patient_id ? patientById.get(link.patient_id) : undefined
+            const name = p ? `${p.first_name} ${p.last_name}` : link.patient_id ? `#${link.patient_id}` : "Nuevo paciente"
             const url = publicUrl(link.token)
             const badge = getStatusBadge(link.status, link.use_count, link.max_uses)
             const isActive = link.status === "active"
@@ -315,6 +331,13 @@ export default function IntakeLinks() {
                       )}
                       <div className="flex items-center gap-2 mt-1">
                         <Badge variant={badge.variant}>{badge.label}</Badge>
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          link.link_type === "register"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : "bg-blue-50 text-blue-700"
+                        }`}>
+                          {link.link_type === "register" ? "📝 Registro" : "🔄 Actualización"}
+                        </span>
                         <span className="text-xs text-slate-400">
                           {link.use_count}/{link.max_uses} usos
                         </span>
@@ -367,12 +390,12 @@ export default function IntakeLinks() {
       )}
 
       {/* ShareModal */}
-      {sharePatientId > 0 && (
+      {shareModalOpen && (
         <ShareModal
           open={shareModalOpen}
           onClose={handleShareModalClose}
-          patientId={sharePatientId}
-          patientName={sharePatientName}
+          patientId={sharePatientId > 0 ? sharePatientId : undefined}
+          patientName={sharePatientName || undefined}
         />
       )}
     </div>

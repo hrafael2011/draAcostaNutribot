@@ -209,7 +209,8 @@ export function getIntakeLinks() {
 }
 
 export function createIntakeLink(body: {
-  patient_id: number
+  patient_id?: number
+  link_type?: string
   expires_in_days?: number
   max_uses?: number
 }) {
@@ -229,6 +230,17 @@ export function validateIntakeToken(token: string) {
   return fetch(`${API_BASE_URL}/intake-links/public/${encodeURIComponent(token)}`).then(
     (r) => parseJson<IntakePublicMeta>(r),
   )
+}
+
+export function updateIntakeForm(token: string, body: Record<string, unknown>) {
+  return fetch(`${API_BASE_URL}/intake-links/public/${token}/update`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then((r) => {
+    if (!r.ok) throw new Error("Error al actualizar datos")
+    return r.json()
+  })
 }
 
 export function submitIntakeForm(token: string, body: Record<string, unknown>) {

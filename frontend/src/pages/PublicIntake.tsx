@@ -1,6 +1,6 @@
 import { type CSSProperties, FormEvent, useEffect, useMemo, useState } from "react"
 import { useParams } from "react-router-dom"
-import { submitIntakeForm, validateIntakeToken } from "../services/api"
+import { submitIntakeForm, updateIntakeForm, validateIntakeToken } from "../services/api"
 import type { IntakePublicMeta } from "../types"
 import DatePicker from "../components/ui/DatePicker"
 import NoAplicaField from "../components/ui/NoAplicaField"
@@ -19,6 +19,7 @@ const COUNTRY_CITIES: Record<string, string[]> = {
 export default function PublicIntake() {
   const { token } = useParams()
   const [meta, setMeta] = useState<IntakePublicMeta | null>(null)
+  const [linkType, setLinkType] = useState<"register" | "update">("register")
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const [country, setCountry] = useState("")
@@ -40,7 +41,10 @@ export default function PublicIntake() {
     let cancelled = false
     validateIntakeToken(token)
       .then((m) => {
-        if (!cancelled) setMeta(m)
+        if (!cancelled) {
+          setMeta(m)
+          if (m.link_type) setLinkType(m.link_type as "register" | "update")
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : "Error")
@@ -60,18 +64,42 @@ export default function PublicIntake() {
       const v = str(k)
       return v === "" ? null : v
     }
-    const num = (k: string, required: boolean) => {
-      const v = str(k)
-      if (!v) return required ? NaN : null
-      const n = Number(v)
-      return Number.isFinite(n) ? n : null
-    }
     const weightKgNum = parseFloat(weightKg);
     const heightCmNum = parseFloat(heightCm);
 
     const weight_kg = !isNaN(weightKgNum) && weightKgNum > 0 ? weightKgNum : NaN;
     const height_cm = !isNaN(heightCmNum) && heightCmNum > 0 ? heightCmNum : NaN;
 
+    setError(null)
+
+    if (linkType === "update") {
+      const updateBody: Record<string, unknown> = {}
+      const firstName = str("first_name")
+      const lastName = str("last_name")
+      if (firstName) updateBody.first_name = firstName
+      if (lastName) updateBody.last_name = lastName
+      if (str("whatsapp")) updateBody.whatsapp = optStr("whatsapp")
+      if (str("email")) updateBody.email = optStr("email")
+      if (country) updateBody.country = country
+      if (city) updateBody.city = city
+      if (Number.isFinite(weight_kg)) updateBody.weight_kg = weight_kg
+      if (Number.isFinite(height_cm)) updateBody.height_cm = height_cm
+      try {
+        await updateIntakeForm(token, updateBody)
+        setDone(true)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Update failed")
+      }
+      return
+    }
+
+    // Register flow — full submission
+    const num = (k: string) => {
+      const v = str(k)
+      if (!v) return null
+      const n = Number(v)
+      return Number.isFinite(n) ? n : null
+    }
     const body: Record<string, unknown> = {
       first_name: str("first_name"),
       last_name: str("last_name"),
@@ -92,22 +120,16 @@ export default function PublicIntake() {
       dietary_style: optStr("dietary_style"),
       food_preferences: optStr("food_preferences"),
       disliked_foods: optStr("disliked_foods"),
-      water_intake_liters: num("water_intake_liters", false),
-      stress_level: num("stress_level", false),
-      sleep_quality: num("sleep_quality", false),
-      sleep_hours: num("sleep_hours", false),
+      water_intake_liters: num("water_intake_liters"),
+      stress_level: num("stress_level"),
+      sleep_quality: num("sleep_quality"),
+      sleep_hours: num("sleep_hours"),
       budget_level: optStr("budget_level"),
       activity_level: optStr("activity_level"),
-      adherence_level: num("adherence_level", false),
-      exercise_frequency_per_week: num("exercise_frequency_per_week", false),
+      adherence_level: num("adherence_level"),
+      exercise_frequency_per_week: num("exercise_frequency_per_week"),
       exercise_type: optStr("exercise_type"),
       extra_notes: optStr("extra_notes"),
-      neck_cm: num("neck_cm", false),
-      chest_cm: num("chest_cm", false),
-      waist_cm: num("waist_cm", false),
-      hip_cm: num("hip_cm", false),
-      leg_cm: num("leg_cm", false),
-      calf_cm: num("calf_cm", false),
     }
     if (!country || !(city || str("city_other"))) {
       setError("Country and city are required")
@@ -117,7 +139,6 @@ export default function PublicIntake() {
       setError("Weight and height are required in valid units")
       return
     }
-    setError(null)
     try {
       await submitIntakeForm(token, body)
       setDone(true)
@@ -163,8 +184,12 @@ export default function PublicIntake() {
   if (done) {
     return (
       <div style={wrap}>
-        <h1>Thank you</h1>
-        <p>Your information was submitted successfully.</p>
+        <h1 style={{ marginTop: 0 }}>{linkType === "register" ? "¡Registro completado!" : "¡Datos actualizados!"}</h1>
+        <p style={{ color: "#555" }}>
+          {linkType === "register"
+            ? "Tu información ha sido enviada correctamente. El equipo de la Dra. Acosta se pondrá en contacto contigo."
+            : "Tus datos han sido actualizados correctamente."}
+        </p>
       </div>
     )
   }
@@ -225,107 +250,77 @@ export default function PublicIntake() {
           <input name="city_other" required style={input} placeholder="Type city" />
         )}
 
-        <h2 style={{ fontSize: 16 }}>Measurements *</h2>
-        <label style={{ fontSize: 13 }}>Peso *</label>
-        <WeightInput valueKg={weightKg} onChangeKg={setWeightKg} name="weight_kg" required />
-        <label style={{ fontSize: 13, marginTop: 10 }}>Estatura *</label>
-        <HeightInput valueCm={heightCm} onChangeCm={setHeightCm} name="height_cm" required />
-        <label style={{ fontSize: 13 }}>Neck (cm)</label>
-        <input name="neck_cm" type="number" step="0.1" style={input} />
-        <label style={{ fontSize: 13 }}>Chest (cm)</label>
-        <input name="chest_cm" type="number" step="0.1" style={input} />
-        <label style={{ fontSize: 13 }}>Waist (cm)</label>
-        <input name="waist_cm" type="number" step="0.1" style={input} />
-        <label style={{ fontSize: 13 }}>Hip (cm)</label>
-        <input name="hip_cm" type="number" step="0.1" style={input} />
-        <label style={{ fontSize: 13 }}>Leg (cm)</label>
-        <input name="leg_cm" type="number" step="0.1" style={input} />
-        <label style={{ fontSize: 13 }}>Calf (cm)</label>
-        <input name="calf_cm" type="number" step="0.1" style={input} />
+        <h2 style={{ fontSize: 16 }}>{linkType === "update" ? "Actualizar medidas" : "Measurements *"}</h2>
+        <label style={{ fontSize: 13 }}>Peso{linkType === "register" ? " *" : ""}</label>
+        <WeightInput valueKg={weightKg} onChangeKg={setWeightKg} name="weight_kg" required={linkType === "register"} />
+        <label style={{ fontSize: 13, marginTop: 10 }}>Estatura{linkType === "register" ? " *" : ""}</label>
+        <HeightInput valueCm={heightCm} onChangeCm={setHeightCm} name="height_cm" required={linkType === "register"} />
+        {linkType === "register" && (
+          <>
+            <label style={{ fontSize: 13 }}>Neck (cm)</label>
+            <input name="neck_cm" type="number" step="0.1" style={input} />
+            <label style={{ fontSize: 13 }}>Chest (cm)</label>
+            <input name="chest_cm" type="number" step="0.1" style={input} />
+            <label style={{ fontSize: 13 }}>Waist (cm)</label>
+            <input name="waist_cm" type="number" step="0.1" style={input} />
+            <label style={{ fontSize: 13 }}>Hip (cm)</label>
+            <input name="hip_cm" type="number" step="0.1" style={input} />
+            <label style={{ fontSize: 13 }}>Leg (cm)</label>
+            <input name="leg_cm" type="number" step="0.1" style={input} />
+            <label style={{ fontSize: 13 }}>Calf (cm)</label>
+            <input name="calf_cm" type="number" step="0.1" style={input} />
+          </>
+        )}
 
-        <h2 style={{ fontSize: 16 }}>Goals & health</h2>
-        <label style={{ fontSize: 13 }}>Main objective *</label>
-        <select name="objective" value={objective} onChange={(e) => setObjective(e.target.value)} required style={input}>
-          {OBJECTIVE_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        <NoAplicaField
-          label="Diseases / diagnoses"
-          value={diseases}
-          onChange={setDiseases}
-          name="diseases"
-          placeholder="Ej. Diabetes tipo 2, Hipertensión"
-        />
-        <NoAplicaField
-          label="Medications"
-          value={medications}
-          onChange={setMedications}
-          name="medications"
-          placeholder="Ej. Metformina 500mg, Losartán 50mg"
-        />
-        <NoAplicaField
-          label="Food allergies"
-          value={foodAllergies}
-          onChange={setFoodAllergies}
-          name="food_allergies"
-          type="input"
-          placeholder="Ej. Gluten, lactosa"
-        />
-        <NoAplicaField
-          label="Foods avoided"
-          value={foodsAvoided}
-          onChange={setFoodsAvoided}
-          name="foods_avoided"
-          type="input"
-          placeholder="Ej. Lácteos, gluten"
-        />
-        <NoAplicaField
-          label="Medical history"
-          value={medicalHistory}
-          onChange={setMedicalHistory}
-          name="medical_history"
-          placeholder="Include diagnoses, surgeries, relevant events and current follow-up."
-        />
-        <label style={{ fontSize: 13 }}>Dietary style</label>
-        <input name="dietary_style" style={input} />
-        <label style={{ fontSize: 13 }}>Foods you like</label>
-        <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
-          Be specific: preferred proteins, carbs, vegetables, fruits and usual preparations.
-        </p>
-        <textarea name="food_preferences" rows={2} style={{ ...input, minHeight: 48 }} />
-        <label style={{ fontSize: 13 }}>Foods you dislike</label>
-        <textarea name="disliked_foods" rows={2} style={{ ...input, minHeight: 48 }} />
+        {linkType === "register" && (
+          <>
+            <h2 style={{ fontSize: 16 }}>Goals & health</h2>
+            <label style={{ fontSize: 13 }}>Main objective *</label>
+            <select name="objective" value={objective} onChange={(e) => setObjective(e.target.value)} required style={input}>
+              {OBJECTIVE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+            <NoAplicaField label="Diseases / diagnoses" value={diseases} onChange={setDiseases} name="diseases" placeholder="Ej. Diabetes tipo 2, Hipertensión" />
+            <NoAplicaField label="Medications" value={medications} onChange={setMedications} name="medications" placeholder="Ej. Metformina 500mg, Losartán 50mg" />
+            <NoAplicaField label="Food allergies" value={foodAllergies} onChange={setFoodAllergies} name="food_allergies" type="input" placeholder="Ej. Gluten, lactosa" />
+            <NoAplicaField label="Foods avoided" value={foodsAvoided} onChange={setFoodsAvoided} name="foods_avoided" type="input" placeholder="Ej. Lácteos, gluten" />
+            <NoAplicaField label="Medical history" value={medicalHistory} onChange={setMedicalHistory} name="medical_history" placeholder="Include diagnoses, surgeries, relevant events and current follow-up." />
+            <label style={{ fontSize: 13 }}>Dietary style</label>
+            <input name="dietary_style" style={input} />
+            <label style={{ fontSize: 13 }}>Foods you like</label>
+            <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>Be specific: preferred proteins, carbs, vegetables, fruits and usual preparations.</p>
+            <textarea name="food_preferences" rows={2} style={{ ...input, minHeight: 48 }} />
+            <label style={{ fontSize: 13 }}>Foods you dislike</label>
+            <textarea name="disliked_foods" rows={2} style={{ ...input, minHeight: 48 }} />
 
-        <h2 style={{ fontSize: 16 }}>Habits</h2>
-        <label style={{ fontSize: 13 }}>Water (liters / day)</label>
-        <input name="water_intake_liters" type="number" step="0.1" style={input} />
-        <label style={{ fontSize: 13 }}>Activity level</label>
-        <input name="activity_level" placeholder="e.g. low / moderate" style={input} />
-        <label style={{ fontSize: 13 }}>Stress (1–5)</label>
-        <input name="stress_level" type="number" style={input} />
-        <label style={{ fontSize: 13 }}>Sleep quality (1–5)</label>
-        <input name="sleep_quality" type="number" style={input} />
-        <label style={{ fontSize: 13 }}>Sleep hours</label>
-        <input name="sleep_hours" type="number" step="0.1" style={input} />
-        <label style={{ fontSize: 13 }}>Budget level</label>
-        <input name="budget_level" placeholder="e.g. medium" style={input} />
-        <label style={{ fontSize: 13 }}>Expected adherence (1–5)</label>
-        <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
-          1 = very hard to follow, 5 = very likely to follow consistently.
-        </p>
-        <input name="adherence_level" type="number" style={input} />
-        <label style={{ fontSize: 13 }}>Exercise days / week</label>
-        <input name="exercise_frequency_per_week" type="number" style={input} />
-        <label style={{ fontSize: 13 }}>Exercise type</label>
-        <input name="exercise_type" style={input} />
-        <label style={{ fontSize: 13 }}>Anything else we should know</label>
-        <textarea name="extra_notes" rows={2} style={{ ...input, minHeight: 48 }} />
+            <h2 style={{ fontSize: 16 }}>Habits</h2>
+            <label style={{ fontSize: 13 }}>Water (liters / day)</label>
+            <input name="water_intake_liters" type="number" step="0.1" style={input} />
+            <label style={{ fontSize: 13 }}>Activity level</label>
+            <input name="activity_level" placeholder="e.g. low / moderate" style={input} />
+            <label style={{ fontSize: 13 }}>Stress (1–5)</label>
+            <input name="stress_level" type="number" style={input} />
+            <label style={{ fontSize: 13 }}>Sleep quality (1–5)</label>
+            <input name="sleep_quality" type="number" style={input} />
+            <label style={{ fontSize: 13 }}>Sleep hours</label>
+            <input name="sleep_hours" type="number" step="0.1" style={input} />
+            <label style={{ fontSize: 13 }}>Budget level</label>
+            <input name="budget_level" placeholder="e.g. medium" style={input} />
+            <label style={{ fontSize: 13 }}>Expected adherence (1–5)</label>
+            <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>1 = very hard to follow, 5 = very likely to follow consistently.</p>
+            <input name="adherence_level" type="number" style={input} />
+            <label style={{ fontSize: 13 }}>Exercise days / week</label>
+            <input name="exercise_frequency_per_week" type="number" style={input} />
+            <label style={{ fontSize: 13 }}>Exercise type</label>
+            <input name="exercise_type" style={input} />
+            <label style={{ fontSize: 13 }}>Anything else we should know</label>
+            <textarea name="extra_notes" rows={2} style={{ ...input, minHeight: 48 }} />
+          </>
+        )}
 
         <button type="submit" style={{ padding: "12px 20px", marginTop: 8 }}>
-          Submit
+          {linkType === "update" ? "Actualizar datos" : "Submit"}
         </button>
       </form>
     </div>
