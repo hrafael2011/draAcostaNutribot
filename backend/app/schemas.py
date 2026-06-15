@@ -227,7 +227,8 @@ class PatientMetricsCreate(BaseModel):
 
 
 class IntakeLinkCreate(BaseModel):
-    patient_id: int
+    patient_id: Optional[int] = None
+    link_type: str = "register"
     expires_in_days: int = Field(default=7, ge=1, le=365)
     max_uses: int = Field(default=1, ge=1, le=50)
 
@@ -235,7 +236,8 @@ class IntakeLinkCreate(BaseModel):
 class IntakeLinkOut(BaseModel):
     id: int
     doctor_id: int
-    patient_id: int
+    patient_id: Optional[int] = None
+    link_type: str = "register"
     token: str
     status: str
     expires_at: datetime
@@ -249,6 +251,7 @@ class IntakeLinkOut(BaseModel):
 
 class IntakeLinkPublicMeta(BaseModel):
     valid: bool
+    link_type: Optional[str] = None
     expires_at: Optional[datetime] = None
     patient_first_name: Optional[str] = None
     patient_last_name: Optional[str] = None
@@ -295,41 +298,16 @@ class IntakePublicSubmit(BaseModel):
 
 
 class IntakeUpdateSubmit(BaseModel):
-    """Campos opcionales para actualización de paciente existente vía link."""
+    """Campos opcionales para actualización de paciente existente vía link.
+    Solo datos personales y medidas — el perfil clínico solo lo modifica el médico."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    birth_date: Optional[date] = None
-    sex: Optional[str] = None
     whatsapp: Optional[str] = None
     email: Optional[EmailStr] = None
     country: Optional[str] = None
     city: Optional[str] = None
-    objective: Optional[str] = None
-    diseases: Optional[str] = None
-    medications: Optional[str] = None
-    food_allergies: Optional[str] = None
-    foods_avoided: Optional[str] = None
-    dietary_style: Optional[str] = None
-    food_preferences: Optional[str] = None
-    disliked_foods: Optional[str] = None
-    water_intake_liters: Optional[float] = None
-    activity_level: Optional[str] = None
-    stress_level: Optional[int] = None
-    sleep_quality: Optional[int] = None
-    sleep_hours: Optional[float] = None
-    budget_level: Optional[str] = None
-    adherence_level: Optional[int] = None
-    exercise_frequency_per_week: Optional[int] = None
-    exercise_type: Optional[str] = None
-    extra_notes: Optional[str] = None
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
-    neck_cm: Optional[float] = None
-    chest_cm: Optional[float] = None
-    waist_cm: Optional[float] = None
-    hip_cm: Optional[float] = None
-    leg_cm: Optional[float] = None
-    calf_cm: Optional[float] = None
 
 
 class DietGenerateRequest(BaseModel):

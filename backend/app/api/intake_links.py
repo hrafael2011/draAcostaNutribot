@@ -40,17 +40,25 @@ async def create_link(
     db: AsyncSession = Depends(get_db),
     doctor: Doctor = Depends(get_current_doctor),
 ):
-    patient = await db.get(Patient, body.patient_id)
-    if patient is None or patient.doctor_id != doctor.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
-        )
+    if body.link_type == "update":
+        if body.patient_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="patient_id is required for update links",
+            )
+        patient = await db.get(Patient, body.patient_id)
+        if patient is None or patient.doctor_id != doctor.id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Patient not found",
+            )
+
     token = secrets.token_urlsafe(32)
     expires_at = utcnow() + timedelta(days=body.expires_in_days)
     link = PatientIntakeLink(
         doctor_id=doctor.id,
         patient_id=body.patient_id,
+        link_type=body.link_type,
         token=token,
         expires_at=expires_at,
         max_uses=body.max_uses,
@@ -105,9 +113,10 @@ async def public_validate(token: str, db: AsyncSession = Depends(get_db)):
         )
     if link.use_count >= link.max_uses:
         return IntakeLinkPublicMeta(valid=False, message="Link already used")
-    patient = await db.get(Patient, link.patient_id)
+    patient = await db.get(Patient, link.patient_id) if link.patient_id else None
     return IntakeLinkPublicMeta(
         valid=True,
+        link_type=link.link_type,
         expires_at=link.expires_at,
         patient_first_name=patient.first_name if patient else None,
         patient_last_name=patient.last_name if patient else None,
@@ -137,12 +146,30 @@ async def public_submit(
     if link.use_count >= link.max_uses:
         raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link already used")
 
-    patient = await db.get(Patient, link.patient_id)
-    if patient is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Patient not found",
+    if link.link_type == "register" and link.patient_id is None:
+        # Create new patient for registration flow
+        patient = Patient(
+            doctor_id=link.doctor_id,
+            first_name=body.first_name,
+            last_name=body.last_name,
+            birth_date=body.birth_date,
+            sex=body.sex,
+            whatsapp=body.whatsapp,
+            email=str(body.email) if body.email else None,
+            country=body.country,
+            city=body.city,
+            source="intake_link",
         )
+        db.add(patient)
+        await db.flush()
+        link.patient_id = patient.id
+    else:
+        patient = await db.get(Patient, link.patient_id)
+        if patient is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Patient not found",
+            )
 
     patient.first_name = body.first_name
     patient.last_name = body.last_name
@@ -251,9 +278,9 @@ async def public_update(
     if patient is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found")
 
-    # Update patient base fields only if provided
+    # Update patient base fields only if provided (only personal info)
     patient_fields = [
-        "first_name", "last_name", "birth_date", "sex", "whatsapp", "email",
+        "first_name", "last_name", "whatsapp", "email",
         "country", "city",
     ]
     for field_name in patient_fields:
@@ -262,34 +289,10 @@ async def public_update(
             setattr(patient, field_name, value)
     patient.updated_at = utcnow()
 
-    # Update profile fields only if provided
-    profile_fields = [
-        "objective", "diseases", "medications", "food_allergies", "foods_avoided",
-        "dietary_style", "food_preferences", "disliked_foods", "water_intake_liters",
-        "activity_level", "stress_level", "sleep_quality", "sleep_hours",
-        "budget_level", "adherence_level", "exercise_frequency_per_week",
-        "exercise_type", "extra_notes",
-    ]
-    has_profile_update = any(getattr(body, f, None) is not None for f in profile_fields)
-    if has_profile_update:
-        pr_result = await db.execute(
-            select(PatientProfile).where(PatientProfile.patient_id == patient.id)
-        )
-        profile = pr_result.scalar_one_or_none()
-        if profile is None:
-            profile = PatientProfile(patient_id=patient.id)
-            db.add(profile)
-        for field_name in profile_fields:
-            value = getattr(body, field_name, None)
-            if value is not None:
-                setattr(profile, field_name, value)
-        profile.updated_at = utcnow()
+    # NOTE: Profile fields (clinical data) are NOT updated here — only doctor can modify them
 
-    # Add metric entry only if any measurement provided
-    metric_fields = [
-        "weight_kg", "height_cm", "neck_cm", "chest_cm", "waist_cm",
-        "hip_cm", "leg_cm", "calf_cm",
-    ]
+    # Add metric entry only if weight or height provided
+    metric_fields = ["weight_kg", "height_cm"]
     has_metric = any(getattr(body, f, None) is not None for f in metric_fields)
     if has_metric:
         metric = PatientMetrics(
