@@ -4,6 +4,11 @@ import { X, CaretDown, CaretUp, Spinner } from "@phosphor-icons/react";
 import { createPatient, patchProfile, addMetric } from "../../services/api";
 import { useToast } from "../../context/ToastContext";
 import type { Patient } from "../../types";
+import DatePicker from "../ui/DatePicker";
+import NoAplicaField from "../ui/NoAplicaField";
+import WeightInput from "../ui/WeightInput";
+import HeightInput from "../ui/HeightInput";
+import { OBJECTIVE_OPTIONS } from "../../constants/objectives";
 
 type PatientDrawerProps = {
   open: boolean;
@@ -53,15 +58,6 @@ const INITIAL_FORM: PatientFormData = {
   weight_kg: "",
   height_cm: "",
 };
-
-const OBJECTIVES: { value: string; label: string }[] = [
-  { value: "", label: "Sin especificar" },
-  { value: "fat_loss", label: "Pérdida de grasa" },
-  { value: "muscle_gain", label: "Ganancia muscular" },
-  { value: "maintenance", label: "Mantenimiento" },
-  { value: "health_improvement", label: "Mejora de salud" },
-  { value: "sports_performance", label: "Rendimiento deportivo" },
-];
 
 const DIETARY_STYLES: { value: string; label: string }[] = [
   { value: "", label: "Sin especificar" },
@@ -281,12 +277,10 @@ export default function PatientDrawer({ open, onClose, onCreated }: PatientDrawe
                       <label htmlFor="drawer-birth-date" className={LABEL_CLASS}>
                         Fecha nacimiento
                       </label>
-                      <input
-                        id="drawer-birth-date"
-                        type="date"
+                      <DatePicker
                         value={form.birth_date}
-                        onChange={setField("birth_date")}
-                        className={INPUT_CLASS}
+                        onChange={(iso) => setForm((prev) => ({ ...prev, birth_date: iso }))}
+                        placeholder="DD/MM/AAAA"
                       />
                     </div>
                     <div>
@@ -405,65 +399,37 @@ export default function PatientDrawer({ open, onClose, onCreated }: PatientDrawe
                               onChange={setField("objective")}
                               className={INPUT_CLASS}
                             >
-                              {OBJECTIVES.map((o) => (
+                              {OBJECTIVE_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value}>
                                   {o.label}
                                 </option>
                               ))}
                             </select>
                           </div>
-                          <div>
-                            <label htmlFor="drawer-diseases" className={LABEL_CLASS}>
-                              Enfermedades
-                            </label>
-                            <textarea
-                              id="drawer-diseases"
-                              value={form.diseases}
-                              onChange={setField("diseases")}
-                              rows={2}
-                              placeholder="Ej. Diabetes tipo 2, Hipertensión"
-                              className={INPUT_CLASS + " resize-none"}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="drawer-medications" className={LABEL_CLASS}>
-                              Medicamentos
-                            </label>
-                            <textarea
-                              id="drawer-medications"
-                              value={form.medications}
-                              onChange={setField("medications")}
-                              rows={2}
-                              placeholder="Ej. Metformina 500mg, Losartán 50mg"
-                              className={INPUT_CLASS + " resize-none"}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="drawer-allergies" className={LABEL_CLASS}>
-                              Alergias alimentarias
-                            </label>
-                            <textarea
-                              id="drawer-allergies"
-                              value={form.food_allergies}
-                              onChange={setField("food_allergies")}
-                              rows={2}
-                              placeholder="Ej. Mariscos, Maní"
-                              className={INPUT_CLASS + " resize-none"}
-                            />
-                          </div>
-                          <div>
-                            <label htmlFor="drawer-foods-avoided" className={LABEL_CLASS}>
-                              Alimentos a evitar
-                            </label>
-                            <textarea
-                              id="drawer-foods-avoided"
-                              value={form.foods_avoided}
-                              onChange={setField("foods_avoided")}
-                              rows={2}
-                              placeholder="Ej. Lácteos, Gluten"
-                              className={INPUT_CLASS + " resize-none"}
-                            />
-                          </div>
+                          <NoAplicaField
+                            label="Enfermedades"
+                            value={form.diseases}
+                            onChange={(v) => setForm((prev) => ({ ...prev, diseases: v }))}
+                            placeholder="Ej. Diabetes tipo 2, Hipertensión"
+                          />
+                          <NoAplicaField
+                            label="Medicamentos"
+                            value={form.medications}
+                            onChange={(v) => setForm((prev) => ({ ...prev, medications: v }))}
+                            placeholder="Ej. Metformina 500mg, Losartán 50mg"
+                          />
+                          <NoAplicaField
+                            label="Alergias alimentarias"
+                            value={form.food_allergies}
+                            onChange={(v) => setForm((prev) => ({ ...prev, food_allergies: v }))}
+                            placeholder="Ej. Mariscos, Maní"
+                          />
+                          <NoAplicaField
+                            label="Alimentos a evitar"
+                            value={form.foods_avoided}
+                            onChange={(v) => setForm((prev) => ({ ...prev, foods_avoided: v }))}
+                            placeholder="Ej. Lácteos, Gluten"
+                          />
                           <div>
                             <label htmlFor="drawer-dietary-style" className={LABEL_CLASS}>
                               Estilo de alimentación
@@ -516,33 +482,19 @@ export default function PatientDrawer({ open, onClose, onCreated }: PatientDrawe
                       >
                         <div className="grid grid-cols-2 gap-4 pt-4">
                           <div>
-                            <label htmlFor="drawer-weight" className={LABEL_CLASS}>
-                              Peso (kg)
-                            </label>
-                            <input
-                              id="drawer-weight"
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={form.weight_kg}
-                              onChange={setField("weight_kg")}
+                            <label className={LABEL_CLASS}>Peso</label>
+                            <WeightInput
+                              valueKg={form.weight_kg}
+                              onChangeKg={(v) => setForm((prev) => ({ ...prev, weight_kg: v }))}
                               placeholder="Ej. 70.5"
-                              className={INPUT_CLASS}
                             />
                           </div>
                           <div>
-                            <label htmlFor="drawer-height" className={LABEL_CLASS}>
-                              Altura (cm)
-                            </label>
-                            <input
-                              id="drawer-height"
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              value={form.height_cm}
-                              onChange={setField("height_cm")}
+                            <label className={LABEL_CLASS}>Altura</label>
+                            <HeightInput
+                              valueCm={form.height_cm}
+                              onChangeCm={(v) => setForm((prev) => ({ ...prev, height_cm: v }))}
                               placeholder="Ej. 170"
-                              className={INPUT_CLASS}
                             />
                           </div>
                         </div>
