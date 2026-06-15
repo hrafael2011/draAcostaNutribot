@@ -12,6 +12,11 @@ import {
 import { SkeletonCard } from "../components/ui/Skeleton"
 import { useToast } from "../context/ToastContext"
 import type { Patient, PatientMetric, PatientProfile, PatientSummary } from "../types"
+import DatePicker from "../components/ui/DatePicker"
+import NoAplicaField from "../components/ui/NoAplicaField"
+import WeightInput from "../components/ui/WeightInput"
+import HeightInput from "../components/ui/HeightInput"
+import { OBJECTIVE_OPTIONS } from "../constants/objectives"
 
 // ── Opciones predefinidas ───────────────────────────────────────────────────
 
@@ -297,6 +302,14 @@ export default function PatientDetail() {
   const [mWeight, setMWeight] = useState("")
   const [mHeight, setMHeight] = useState("")
   const [mNotes, setMNotes] = useState("")
+
+  // Edit form controlled states
+  const [editBirthDate, setEditBirthDate] = useState(
+    patient?.birth_date?.slice(0, 10) ?? "",
+  )
+  const [editMedications, setEditMedications] = useState(
+    profile?.medications ?? "",
+  )
 
   // Inline edit booleans
   const [editingData, setEditingData] = useState(false)
@@ -650,6 +663,8 @@ export default function PatientDetail() {
               onClick={() => {
                 setDataFormKey((k) => k + 1)
                 setProfileFormKey((k) => k + 1)
+                setEditBirthDate(patient.birth_date?.slice(0, 10) ?? "")
+                setEditMedications(profile?.medications ?? "")
                 setEditingData(true)
                 setEditingProfile(true)
               }}
@@ -840,11 +855,11 @@ export default function PatientDetail() {
               <label className="block text-xs font-medium text-slate-500 mb-1">
                 Fecha de nacimiento
               </label>
-              <input
+              <DatePicker
+                value={editBirthDate}
+                onChange={setEditBirthDate}
                 name="birth_date"
-                type="date"
-                defaultValue={patient.birth_date?.slice(0, 10) ?? ""}
-                className={INPUT_CLASSES}
+                placeholder="DD/MM/AAAA"
               />
             </div>
 
@@ -987,11 +1002,11 @@ export default function PatientDetail() {
                 defaultValue={profile?.objective ?? ""}
                 className={SELECT_CLASSES}
               >
-                <option value="">— Seleccionar —</option>
-                <option value="Bajar de peso">Bajar de peso</option>
-                <option value="Mantenimiento">Mantenimiento</option>
-                <option value="Ganar músculo">Ganar músculo</option>
-                <option value="Subir de peso">Subir de peso</option>
+                {OBJECTIVE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -1010,17 +1025,13 @@ export default function PatientDetail() {
             </div>
 
             {/* Medicamentos */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Medicamentos
-              </label>
-              <textarea
-                name="medications"
-                rows={2}
-                defaultValue={profile?.medications ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
+            <NoAplicaField
+              label="Medicamentos"
+              value={editMedications}
+              onChange={setEditMedications}
+              name="medications"
+              placeholder="Ej. Metformina 500mg, Losartán 50mg"
+            />
 
             {/* Alergias */}
             <div>
@@ -1376,23 +1387,21 @@ export default function PatientDetail() {
             <p className="text-sm font-medium text-slate-700">Nueva medición</p>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
-                Peso (kg)
+                Peso
               </label>
-              <input
-                value={mWeight}
-                onChange={(e) => setMWeight(e.target.value)}
-                className={INPUT_CLASSES}
+              <WeightInput
+                valueKg={mWeight}
+                onChangeKg={setMWeight}
                 placeholder="ej. 65.0"
               />
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
-                Altura (cm)
+                Altura
               </label>
-              <input
-                value={mHeight}
-                onChange={(e) => setMHeight(e.target.value)}
-                className={INPUT_CLASSES}
+              <HeightInput
+                valueCm={mHeight}
+                onChangeCm={setMHeight}
                 placeholder="ej. 162"
               />
             </div>
