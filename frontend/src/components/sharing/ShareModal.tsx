@@ -32,7 +32,7 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const hasWebShare = typeof navigator !== "undefined" && !!navigator.share
+  const hasWebShare = typeof navigator !== "undefined" && typeof navigator.share === "function"
   const { addToast } = useToast()
 
   const handleCreate = async () => {
