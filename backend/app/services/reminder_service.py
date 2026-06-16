@@ -26,8 +26,9 @@ def load_email_template(patient_name: str, link_url: str) -> str:
     </div>
     <h2 style="color:#0f172a;font-size:18px;">¡Hola {patient_name}!</h2>
     <p style="color:#475569;font-size:14px;line-height:1.6;">
-      Ha pasado un mes desde que recibiste tu plan nutricional. Para mantener tus resultados
-      al día, actualiza tu peso y ubicación actual.
+      Ha pasado un mes desde que recibiste tu plan nutricional. Cuéntanos cómo vas,
+      ingresa tu peso actual y, si ya no resides donde antes, aprovecha para
+      actualizar tu ubicación.
     </p>
     <div style="text-align:center;margin:28px 0;">
       <a href="{link_url}" style="background:#10b981;color:#fff;text-decoration:none;padding:14px 32px;border-radius:999px;font-size:15px;font-weight:600;display:inline-block;">
