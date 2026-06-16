@@ -264,37 +264,11 @@ class IntakePublicSubmit(BaseModel):
     birth_date: date
     sex: str
     whatsapp: Optional[str] = None
-    email: Optional[EmailStr] = None
+    email: Optional[EmailStr] = None  # No requerido
     country: str
     city: str
     objective: str
-    diseases: Optional[str] = None
-    medications: Optional[str] = None
-    food_allergies: str
-    foods_avoided: str
-    medical_history: Optional[str] = None
-    dietary_style: Optional[str] = None
-    food_preferences: Optional[str] = None
     disliked_foods: Optional[str] = None
-    meal_schedule: Optional[Any] = None
-    water_intake_liters: Optional[float] = None
-    stress_level: Optional[int] = None
-    sleep_quality: Optional[int] = None
-    sleep_hours: Optional[float] = None
-    budget_level: Optional[str] = None
-    activity_level: Optional[str] = None
-    adherence_level: Optional[int] = None
-    exercise_frequency_per_week: Optional[int] = None
-    exercise_type: Optional[str] = None
-    extra_notes: Optional[str] = None
-    weight_kg: float
-    height_cm: float
-    neck_cm: Optional[float] = None
-    chest_cm: Optional[float] = None
-    waist_cm: Optional[float] = None
-    hip_cm: Optional[float] = None
-    leg_cm: Optional[float] = None
-    calf_cm: Optional[float] = None
 
 
 class IntakeUpdateSubmit(BaseModel):
