@@ -986,304 +986,330 @@ export default function PatientDetail() {
           )}
         </div>
 
+        {/* Pendiente de evaluacion */}
+        {profile && profile.completed_by_patient && !profile.completed_at && (
+          <div className="mb-4 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-center gap-2">
+            <span className="text-amber-600 text-sm shrink-0">⚠️</span>
+            <p className="text-sm text-amber-700">Pendiente de evaluación clínica — completa los datos del paciente tomados en consulta</p>
+          </div>
+        )}
+
         {editingProfile ? (
           <form
             key={profileFormKey}
             onSubmit={onSaveProfile}
-            className="space-y-4 max-w-2xl"
+            className="space-y-6 max-w-2xl"
           >
-            {/* Objetivo */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Objetivo
-              </label>
-              <select
-                name="objective"
-                defaultValue={profile?.objective ?? ""}
-                className={SELECT_CLASSES}
-              >
-                {OBJECTIVE_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
+            {/* Historial Clinico */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Historial Clínico</h4>
+              <div className="space-y-4">
+                {/* Objetivo */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Objetivo
+                  </label>
+                  <select
+                    name="objective"
+                    defaultValue={profile?.objective ?? ""}
+                    className={SELECT_CLASSES}
+                  >
+                    {OBJECTIVE_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Enfermedades */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Enfermedades
+                  </label>
+                  <PillSelect
+                    options={DISEASE_OPTIONS}
+                    selected={diseasesPills}
+                    otherText={diseasesOther}
+                    onChange={setDiseasesPills}
+                    onOtherChange={setDiseasesOther}
+                  />
+                </div>
+
+                {/* Medicamentos */}
+                <NoAplicaField
+                  label="Medicamentos"
+                  value={editMedications}
+                  onChange={setEditMedications}
+                  name="medications"
+                  placeholder="Ej. Metformina 500mg, Losartán 50mg"
+                />
+
+                {/* Alergias */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Alergias alimentarias
+                  </label>
+                  <PillSelect
+                    options={ALLERGY_OPTIONS}
+                    selected={allergiesPills}
+                    otherText={allergiesOther}
+                    onChange={setAllergiesPills}
+                    onOtherChange={setAllergiesOther}
+                  />
+                </div>
+
+                {/* Alimentos evitados */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Alimentos evitados
+                  </label>
+                  <PillSelect
+                    options={FOODS_AVOIDED_OPTIONS}
+                    selected={foodsAvoidedPills}
+                    otherText={foodsAvoidedOther}
+                    onChange={setFoodsAvoidedPills}
+                    onOtherChange={setFoodsAvoidedOther}
+                  />
+                </div>
+
+                {/* Historial médico */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Historial médico
+                  </label>
+                  <textarea
+                    name="medical_history"
+                    rows={2}
+                    defaultValue={profile?.medical_history ?? ""}
+                    className={INPUT_CLASSES}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Enfermedades */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Enfermedades
-              </label>
-              <PillSelect
-                options={DISEASE_OPTIONS}
-                selected={diseasesPills}
-                otherText={diseasesOther}
-                onChange={setDiseasesPills}
-                onOtherChange={setDiseasesOther}
-              />
+            {/* Perfil Nutricional */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Perfil Nutricional</h4>
+              <div className="space-y-4">
+                {/* Estilo dietario */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Estilo dietario
+                  </label>
+                  <PillSelect
+                    options={DIETARY_STYLE_OPTIONS}
+                    selected={dietaryPills}
+                    otherText={dietaryOther}
+                    onChange={setDietaryPills}
+                    onOtherChange={setDietaryOther}
+                  />
+                </div>
+
+                {/* Preferencias alimentarias */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Preferencias alimentarias
+                  </label>
+                  <textarea
+                    name="food_preferences"
+                    rows={2}
+                    defaultValue={profile?.food_preferences ?? ""}
+                    className={INPUT_CLASSES}
+                  />
+                </div>
+
+                {/* Alimentos no deseados */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Alimentos no deseados
+                  </label>
+                  <textarea
+                    name="disliked_foods"
+                    rows={2}
+                    defaultValue={profile?.disliked_foods ?? ""}
+                    className={INPUT_CLASSES}
+                  />
+                </div>
+
+                {/* Agua */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Consumo de agua (L/día)
+                  </label>
+                  <input
+                    name="water_intake_liters"
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                    defaultValue={profile?.water_intake_liters ?? ""}
+                    className={INPUT_CLASSES}
+                  />
+                </div>
+              </div>
             </div>
 
-            {/* Medicamentos */}
-            <NoAplicaField
-              label="Medicamentos"
-              value={editMedications}
-              onChange={setEditMedications}
-              name="medications"
-              placeholder="Ej. Metformina 500mg, Losartán 50mg"
-            />
+            {/* Estilo de Vida */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Estilo de Vida</h4>
+              <div className="space-y-4">
+                {/* Nivel de actividad */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Nivel de actividad
+                  </label>
+                  <select
+                    name="activity_level"
+                    defaultValue={profile?.activity_level ?? ""}
+                    className={SELECT_CLASSES}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    <option value="Sedentario">Sedentario — sin ejercicio</option>
+                    <option value="Ligero">Ligero — 1-2 días/semana</option>
+                    <option value="Moderado">Moderado — 3-4 días/semana</option>
+                    <option value="Alto">Alto — 5-6 días/semana</option>
+                    <option value="Muy alto">Muy alto — atleta / entrenamiento diario</option>
+                  </select>
+                </div>
 
-            {/* Alergias */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Alergias alimentarias
-              </label>
-              <PillSelect
-                options={ALLERGY_OPTIONS}
-                selected={allergiesPills}
-                otherText={allergiesOther}
-                onChange={setAllergiesPills}
-                onOtherChange={setAllergiesOther}
-              />
-            </div>
+                {/* Estrés */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Nivel de estrés
+                  </label>
+                  <select
+                    name="stress_level"
+                    defaultValue={profile?.stress_level ?? ""}
+                    className={SELECT_CLASSES}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    <option value="1">1 — Muy bajo</option>
+                    <option value="2">2 — Bajo</option>
+                    <option value="3">3 — Moderado</option>
+                    <option value="4">4 — Alto</option>
+                    <option value="5">5 — Muy alto</option>
+                  </select>
+                </div>
 
-            {/* Alimentos evitados */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Alimentos evitados
-              </label>
-              <PillSelect
-                options={FOODS_AVOIDED_OPTIONS}
-                selected={foodsAvoidedPills}
-                otherText={foodsAvoidedOther}
-                onChange={setFoodsAvoidedPills}
-                onOtherChange={setFoodsAvoidedOther}
-              />
-            </div>
+                {/* Calidad del sueño */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Calidad del sueño
+                  </label>
+                  <select
+                    name="sleep_quality"
+                    defaultValue={profile?.sleep_quality ?? ""}
+                    className={SELECT_CLASSES}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    <option value="1">1 — Muy mala</option>
+                    <option value="2">2 — Mala</option>
+                    <option value="3">3 — Regular</option>
+                    <option value="4">4 — Buena</option>
+                    <option value="5">5 — Excelente</option>
+                  </select>
+                </div>
 
-            {/* Historial médico */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Historial médico
-              </label>
-              <textarea
-                name="medical_history"
-                rows={2}
-                defaultValue={profile?.medical_history ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
+                {/* Horas de sueño */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Horas de sueño por noche
+                  </label>
+                  <input
+                    name="sleep_hours"
+                    type="number"
+                    step="0.5"
+                    min="3"
+                    max="12"
+                    defaultValue={profile?.sleep_hours ?? ""}
+                    className={INPUT_CLASSES}
+                  />
+                </div>
 
-            {/* Estilo dietario */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Estilo dietario
-              </label>
-              <PillSelect
-                options={DIETARY_STYLE_OPTIONS}
-                selected={dietaryPills}
-                otherText={dietaryOther}
-                onChange={setDietaryPills}
-                onOtherChange={setDietaryOther}
-              />
-            </div>
+                {/* Presupuesto */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Presupuesto para alimentación
+                  </label>
+                  <select
+                    name="budget_level"
+                    defaultValue={profile?.budget_level ?? ""}
+                    className={SELECT_CLASSES}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    <option value="Bajo">Bajo</option>
+                    <option value="Medio">Medio</option>
+                    <option value="Medio-alto">Medio-alto</option>
+                    <option value="Alto">Alto</option>
+                  </select>
+                </div>
 
-            {/* Preferencias alimentarias */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Preferencias alimentarias
-              </label>
-              <textarea
-                name="food_preferences"
-                rows={2}
-                defaultValue={profile?.food_preferences ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
+                {/* Adherencia */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Nivel de adherencia esperado
+                  </label>
+                  <select
+                    name="adherence_level"
+                    defaultValue={profile?.adherence_level ?? ""}
+                    className={SELECT_CLASSES}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    <option value="1">1 — Muy baja</option>
+                    <option value="2">2 — Baja</option>
+                    <option value="3">3 — Moderada</option>
+                    <option value="4">4 — Alta</option>
+                    <option value="5">5 — Muy alta</option>
+                  </select>
+                </div>
 
-            {/* Alimentos no deseados */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Alimentos no deseados
-              </label>
-              <textarea
-                name="disliked_foods"
-                rows={2}
-                defaultValue={profile?.disliked_foods ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
+                {/* Días de ejercicio */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Días de ejercicio por semana
+                  </label>
+                  <select
+                    name="exercise_frequency_per_week"
+                    defaultValue={profile?.exercise_frequency_per_week ?? ""}
+                    className={SELECT_CLASSES}
+                  >
+                    <option value="">— Seleccionar —</option>
+                    {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
+                      <option key={n} value={n}>
+                        {n} {n === 1 ? "día" : "días"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Agua */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Consumo de agua (L/día)
-              </label>
-              <input
-                name="water_intake_liters"
-                type="number"
-                step="0.1"
-                min="0"
-                max="10"
-                defaultValue={profile?.water_intake_liters ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
+                {/* Tipo de ejercicio */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Tipo de ejercicio
+                  </label>
+                  <PillSelect
+                    options={EXERCISE_TYPE_OPTIONS}
+                    selected={exerciseTypePills}
+                    otherText={exerciseTypeOther}
+                    onChange={setExerciseTypePills}
+                    onOtherChange={setExerciseTypeOther}
+                  />
+                </div>
 
-            {/* Nivel de actividad */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Nivel de actividad
-              </label>
-              <select
-                name="activity_level"
-                defaultValue={profile?.activity_level ?? ""}
-                className={SELECT_CLASSES}
-              >
-                <option value="">— Seleccionar —</option>
-                <option value="Sedentario">Sedentario — sin ejercicio</option>
-                <option value="Ligero">Ligero — 1-2 días/semana</option>
-                <option value="Moderado">Moderado — 3-4 días/semana</option>
-                <option value="Alto">Alto — 5-6 días/semana</option>
-                <option value="Muy alto">Muy alto — atleta / entrenamiento diario</option>
-              </select>
-            </div>
-
-            {/* Estrés */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Nivel de estrés
-              </label>
-              <select
-                name="stress_level"
-                defaultValue={profile?.stress_level ?? ""}
-                className={SELECT_CLASSES}
-              >
-                <option value="">— Seleccionar —</option>
-                <option value="1">1 — Muy bajo</option>
-                <option value="2">2 — Bajo</option>
-                <option value="3">3 — Moderado</option>
-                <option value="4">4 — Alto</option>
-                <option value="5">5 — Muy alto</option>
-              </select>
-            </div>
-
-            {/* Calidad del sueño */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Calidad del sueño
-              </label>
-              <select
-                name="sleep_quality"
-                defaultValue={profile?.sleep_quality ?? ""}
-                className={SELECT_CLASSES}
-              >
-                <option value="">— Seleccionar —</option>
-                <option value="1">1 — Muy mala</option>
-                <option value="2">2 — Mala</option>
-                <option value="3">3 — Regular</option>
-                <option value="4">4 — Buena</option>
-                <option value="5">5 — Excelente</option>
-              </select>
-            </div>
-
-            {/* Horas de sueño */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Horas de sueño por noche
-              </label>
-              <input
-                name="sleep_hours"
-                type="number"
-                step="0.5"
-                min="3"
-                max="12"
-                defaultValue={profile?.sleep_hours ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
-
-            {/* Presupuesto */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Presupuesto para alimentación
-              </label>
-              <select
-                name="budget_level"
-                defaultValue={profile?.budget_level ?? ""}
-                className={SELECT_CLASSES}
-              >
-                <option value="">— Seleccionar —</option>
-                <option value="Bajo">Bajo</option>
-                <option value="Medio">Medio</option>
-                <option value="Medio-alto">Medio-alto</option>
-                <option value="Alto">Alto</option>
-              </select>
-            </div>
-
-            {/* Adherencia */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Nivel de adherencia esperado
-              </label>
-              <select
-                name="adherence_level"
-                defaultValue={profile?.adherence_level ?? ""}
-                className={SELECT_CLASSES}
-              >
-                <option value="">— Seleccionar —</option>
-                <option value="1">1 — Muy baja</option>
-                <option value="2">2 — Baja</option>
-                <option value="3">3 — Moderada</option>
-                <option value="4">4 — Alta</option>
-                <option value="5">5 — Muy alta</option>
-              </select>
-            </div>
-
-            {/* Días de ejercicio */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Días de ejercicio por semana
-              </label>
-              <select
-                name="exercise_frequency_per_week"
-                defaultValue={profile?.exercise_frequency_per_week ?? ""}
-                className={SELECT_CLASSES}
-              >
-                <option value="">— Seleccionar —</option>
-                {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
-                  <option key={n} value={n}>
-                    {n} {n === 1 ? "día" : "días"}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tipo de ejercicio */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Tipo de ejercicio
-              </label>
-              <PillSelect
-                options={EXERCISE_TYPE_OPTIONS}
-                selected={exerciseTypePills}
-                otherText={exerciseTypeOther}
-                onChange={setExerciseTypePills}
-                onOtherChange={setExerciseTypeOther}
-              />
-            </div>
-
-            {/* Notas adicionales */}
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Notas adicionales
-              </label>
-              <textarea
-                name="extra_notes"
-                rows={2}
-                defaultValue={profile?.extra_notes ?? ""}
-                className={INPUT_CLASSES}
-              />
+                {/* Notas adicionales */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Notas adicionales
+                  </label>
+                  <textarea
+                    name="extra_notes"
+                    rows={2}
+                    defaultValue={profile?.extra_notes ?? ""}
+                    className={INPUT_CLASSES}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-2 pt-2">
@@ -1303,63 +1329,83 @@ export default function PatientDetail() {
             </div>
           </form>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-            {renderProfileField("Objetivo", profile?.objective)}
-            <div>
-              <span className="text-xs text-slate-500">Enfermedades</span>
-              {renderMultiTag(profile?.diseases)}
+          <div className="space-y-6">
+            {/* Historial Clínico */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Historial Clínico</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                {renderProfileField("Objetivo", profile?.objective)}
+                <div>
+                  <span className="text-xs text-slate-500">Enfermedades</span>
+                  {renderMultiTag(profile?.diseases)}
+                </div>
+                {renderProfileField("Medicamentos", profile?.medications)}
+                <div>
+                  <span className="text-xs text-slate-500">Alergias alimentarias</span>
+                  {renderMultiTag(profile?.food_allergies)}
+                </div>
+                <div>
+                  <span className="text-xs text-slate-500">Alimentos evitados</span>
+                  {renderMultiTag(profile?.foods_avoided)}
+                </div>
+                {renderProfileField("Historial médico", profile?.medical_history)}
+              </div>
             </div>
-            {renderProfileField("Medicamentos", profile?.medications)}
-            <div>
-              <span className="text-xs text-slate-500">Alergias alimentarias</span>
-              {renderMultiTag(profile?.food_allergies)}
+
+            {/* Perfil Nutricional */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Perfil Nutricional</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                <div>
+                  <span className="text-xs text-slate-500">Estilo dietario</span>
+                  {renderMultiTag(profile?.dietary_style)}
+                </div>
+                {renderProfileField("Preferencias alimentarias", profile?.food_preferences)}
+                {renderProfileField("Alimentos no deseados", profile?.disliked_foods)}
+                {renderProfileField(
+                  "Consumo de agua",
+                  profile?.water_intake_liters != null
+                    ? `${profile.water_intake_liters} L/día`
+                    : null
+                )}
+              </div>
             </div>
-            <div>
-              <span className="text-xs text-slate-500">Alimentos evitados</span>
-              {renderMultiTag(profile?.foods_avoided)}
+
+            {/* Estilo de Vida */}
+            <div className="p-4 bg-slate-50 rounded-xl">
+              <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Estilo de Vida</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                {renderProfileField("Nivel de actividad", profile?.activity_level)}
+                {renderProfileField(
+                  "Estrés",
+                  profile?.stress_level != null ? `${profile.stress_level}/5` : null
+                )}
+                {renderProfileField(
+                  "Calidad del sueño",
+                  profile?.sleep_quality != null ? `${profile.sleep_quality}/5` : null
+                )}
+                {renderProfileField(
+                  "Horas de sueño",
+                  profile?.sleep_hours != null ? `${profile.sleep_hours} h` : null
+                )}
+                {renderProfileField("Presupuesto", profile?.budget_level)}
+                {renderProfileField(
+                  "Adherencia",
+                  profile?.adherence_level != null ? `${profile.adherence_level}/5` : null
+                )}
+                {renderProfileField(
+                  "Ejercicio",
+                  profile?.exercise_frequency_per_week != null
+                    ? `${profile.exercise_frequency_per_week} días/sem`
+                    : null
+                )}
+                <div>
+                  <span className="text-xs text-slate-500">Tipo de ejercicio</span>
+                  {renderMultiTag(profile?.exercise_type)}
+                </div>
+                {renderProfileField("Notas adicionales", profile?.extra_notes)}
+              </div>
             </div>
-            {renderProfileField("Historial médico", profile?.medical_history)}
-            <div>
-              <span className="text-xs text-slate-500">Estilo dietario</span>
-              {renderMultiTag(profile?.dietary_style)}
-            </div>
-            {renderProfileField("Preferencias alimentarias", profile?.food_preferences)}
-            {renderProfileField("Alimentos no deseados", profile?.disliked_foods)}
-            {renderProfileField(
-              "Consumo de agua",
-              profile?.water_intake_liters != null
-                ? `${profile.water_intake_liters} L/día`
-                : null
-            )}
-            {renderProfileField("Nivel de actividad", profile?.activity_level)}
-            {renderProfileField(
-              "Estrés",
-              profile?.stress_level != null ? `${profile.stress_level}/5` : null
-            )}
-            {renderProfileField(
-              "Calidad del sueño",
-              profile?.sleep_quality != null ? `${profile.sleep_quality}/5` : null
-            )}
-            {renderProfileField(
-              "Horas de sueño",
-              profile?.sleep_hours != null ? `${profile.sleep_hours} h` : null
-            )}
-            {renderProfileField("Presupuesto", profile?.budget_level)}
-            {renderProfileField(
-              "Adherencia",
-              profile?.adherence_level != null ? `${profile.adherence_level}/5` : null
-            )}
-            {renderProfileField(
-              "Ejercicio",
-              profile?.exercise_frequency_per_week != null
-                ? `${profile.exercise_frequency_per_week} días/sem`
-                : null
-            )}
-            <div>
-              <span className="text-xs text-slate-500">Tipo de ejercicio</span>
-              {renderMultiTag(profile?.exercise_type)}
-            </div>
-            {renderProfileField("Notas adicionales", profile?.extra_notes)}
           </div>
         )}
       </div>
