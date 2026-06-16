@@ -182,6 +182,7 @@ async def public_submit(
     patient.source = "intake_link"
     patient.updated_at = utcnow()
 
+    # Profile parcial — solo lo que el paciente puede llenar
     prof_result = await db.execute(
         select(PatientProfile).where(PatientProfile.patient_id == patient.id)
     )
@@ -191,43 +192,11 @@ async def public_submit(
         db.add(profile)
 
     profile.objective = body.objective
-    profile.diseases = body.diseases
-    profile.medications = body.medications
-    profile.food_allergies = body.food_allergies
-    profile.foods_avoided = body.foods_avoided
-    profile.medical_history = body.medical_history
-    profile.dietary_style = body.dietary_style
-    profile.food_preferences = body.food_preferences
     profile.disliked_foods = body.disliked_foods
-    profile.meal_schedule = body.meal_schedule
-    profile.water_intake_liters = body.water_intake_liters
-    profile.stress_level = body.stress_level
-    profile.sleep_quality = body.sleep_quality
-    profile.sleep_hours = body.sleep_hours
-    profile.budget_level = body.budget_level
-    profile.activity_level = body.activity_level
-    profile.adherence_level = body.adherence_level
-    profile.exercise_frequency_per_week = body.exercise_frequency_per_week
-    profile.exercise_type = body.exercise_type
-    profile.extra_notes = body.extra_notes
     profile.completed_by_patient = True
-    profile.completed_at = utcnow()
     profile.updated_at = utcnow()
 
-    metric = PatientMetrics(
-        patient_id=patient.id,
-        weight_kg=body.weight_kg,
-        height_cm=body.height_cm,
-        neck_cm=body.neck_cm,
-        chest_cm=body.chest_cm,
-        waist_cm=body.waist_cm,
-        hip_cm=body.hip_cm,
-        leg_cm=body.leg_cm,
-        calf_cm=body.calf_cm,
-        recorded_at=utcnow(),
-        source="intake_link",
-    )
-    db.add(metric)
+    # NO crear PatientMetrics — el doctor llena medidas en consulta
 
     link.use_count += 1
     link.last_used_at = utcnow()
