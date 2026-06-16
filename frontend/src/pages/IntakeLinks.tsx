@@ -23,6 +23,7 @@ export default function IntakeLinks() {
   const [shareModalOpen, setShareModalOpen] = useState(false)
   const [sharePatientId, setSharePatientId] = useState<number>(0)
   const [sharePatientName, setSharePatientName] = useState("")
+  const [shareLinkType, setShareLinkType] = useState<"register" | "update" | undefined>(undefined)
 
   // "New form" creation flow
   const [creating, setCreating] = useState(false)
@@ -95,6 +96,7 @@ export default function IntakeLinks() {
   function handleCreateRegisterLink() {
     setSharePatientId(0)
     setSharePatientName("")
+    setShareLinkType("register")
     setShareModalOpen(true)
   }
 
@@ -109,6 +111,7 @@ export default function IntakeLinks() {
     if (!p) return
     setSharePatientId(p.id)
     setSharePatientName(`${p.first_name} ${p.last_name}`)
+    setShareLinkType("update")
     setCreating(false)
     setSelectedPatientId("")
     setShareModalOpen(true)
@@ -118,6 +121,7 @@ export default function IntakeLinks() {
     setShareModalOpen(false)
     setSharePatientId(0)
     setSharePatientName("")
+    setShareLinkType(undefined)
     refresh().catch((e) => setError(e instanceof Error ? e.message : "Error"))
   }
 
@@ -421,6 +425,7 @@ export default function IntakeLinks() {
           onClose={handleShareModalClose}
           patientId={sharePatientId > 0 ? sharePatientId : undefined}
           patientName={sharePatientName || undefined}
+          initialLinkType={shareLinkType}
         />
       )}
     </div>

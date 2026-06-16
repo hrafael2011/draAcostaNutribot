@@ -10,6 +10,7 @@ type ShareModalProps = {
   onClose: () => void
   patientId?: number
   patientName?: string
+  initialLinkType?: "register" | "update"
 }
 
 const EMAIL_SUBJECT = encodeURIComponent("Completa tu ficha nutricional - Dra. Acosta")
@@ -25,10 +26,10 @@ const EXPIRATION_OPTIONS = [
   { value: 30, label: "30 días" },
 ]
 
-export default function ShareModal({ open, onClose, patientId, patientName }: ShareModalProps) {
+export default function ShareModal({ open, onClose, patientId, patientName, initialLinkType }: ShareModalProps) {
   const [link, setLink] = useState<IntakeLink | null>(null)
   const [linkType, setLinkType] = useState<"register" | "update">(
-    patientId ? "update" : "register",
+    initialLinkType || (patientId ? "update" : "register"),
   )
   const [selectedDays, setSelectedDays] = useState(7)
   const [loading, setLoading] = useState(false)
@@ -127,12 +128,26 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                     : "El paciente podrá actualizar su peso, país y ciudad. Ideal para seguimiento mensual."}
                 </p>
 
-                {patientId ? (
-                  <div className="flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
-                    <span className="text-sm">🔄</span>
+                {initialLinkType ? (
+                  <div className={`flex items-center gap-2 rounded-xl px-4 py-3 border ${
+                    linkType === "register"
+                      ? "bg-emerald-50 border-emerald-200"
+                      : "bg-blue-50 border-blue-200"
+                  }`}>
+                    <span className="text-sm">{linkType === "register" ? "📝" : "🔄"}</span>
                     <div>
-                      <p className="text-sm font-medium text-blue-800">Actualización — paciente existente</p>
-                      <p className="text-xs text-blue-600">El paciente actualizará peso, país y ciudad</p>
+                      <p className={`text-sm font-medium ${
+                        linkType === "register" ? "text-emerald-800" : "text-blue-800"
+                      }`}>
+                        {linkType === "register" ? "Registro — paciente nuevo" : "Actualización — paciente existente"}
+                      </p>
+                      <p className={`text-xs ${
+                        linkType === "register" ? "text-emerald-600" : "text-blue-600"
+                      }`}>
+                        {linkType === "register"
+                          ? "El paciente creará su perfil por primera vez"
+                          : "El paciente actualizará peso, país y ciudad"}
+                      </p>
                     </div>
                   </div>
                 ) : (
