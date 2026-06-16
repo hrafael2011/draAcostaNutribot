@@ -21,7 +21,9 @@ def load_email_template(patient_name: str, link_url: str) -> str:
 <html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f8fafc;">
   <div style="background:#fff;border-radius:16px;padding:32px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
     <div style="text-align:center;margin-bottom:24px;">
-      <h1 style="color:#065f46;font-size:22px;margin:0 0 8px 0;">Dra. Acosta</h1>
+      <img src="{settings.APP_URL}/static/logo-doctora.jpeg" alt="Dra. Acosta"
+           style="height:80px;width:auto;margin-bottom:12px;border-radius:12px;" />
+      <h1 style="color:#065f46;font-size:22px;margin:0 0 4px 0;">Dra. Acosta</h1>
       <p style="color:#64748b;font-size:14px;margin:0;">Plan Nutricional Personalizado</p>
     </div>
     <h2 style="color:#0f172a;font-size:18px;">¡Hola {patient_name}!</h2>

@@ -1,12 +1,16 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine, Base
 import app.models  # noqa: F401 — registers all ORM models on Base.metadata
+
+logger = logging.getLogger(__name__)
 
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -31,6 +35,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Sirve logo-doctora.jpeg y otros assets para que los emails los muestren
+_public_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "public"
+if _public_dir.exists():
+    app.mount("/static", StaticFiles(directory=str(_public_dir)), name="static")
+    logger.info("Static files served from %s", _public_dir)
 
 
 @app.on_event("startup")
