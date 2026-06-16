@@ -249,7 +249,7 @@ async def public_update(
 
     # Update patient base fields only if provided (only personal info)
     patient_fields = [
-        "first_name", "last_name", "whatsapp", "email",
+        "first_name", "last_name", "whatsapp",
         "country", "city",
     ]
     for field_name in patient_fields:
@@ -261,7 +261,7 @@ async def public_update(
     # NOTE: Profile fields (clinical data) are NOT updated here — only doctor can modify them
 
     # Add metric entry only if weight or height provided
-    metric_fields = ["weight_kg", "height_cm"]
+    metric_fields = ["weight_kg"]
     has_metric = any(getattr(body, f, None) is not None for f in metric_fields)
     if has_metric:
         metric = PatientMetrics(
