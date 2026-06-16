@@ -260,7 +260,7 @@ async def public_update(
 
     # NOTE: Profile fields (clinical data) are NOT updated here — only doctor can modify them
 
-    # Add metric entry only if weight or height provided
+    # Add metric entry only if weight provided
     metric_fields = ["weight_kg"]
     has_metric = any(getattr(body, f, None) is not None for f in metric_fields)
     if has_metric:

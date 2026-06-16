@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react"
 import { Country, State, City } from "country-state-city"
-import type { ICountry, ICity } from "country-state-city"
+import type { ICountry } from "country-state-city"
 
 const COUNTRY_NAMES_ES: Record<string, string> = {
   DO: "República Dominicana",
