@@ -127,19 +127,29 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
                     : "El paciente podrá actualizar su peso, país y ciudad. Ideal para seguimiento mensual."}
                 </p>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Tipo de formulario
-                  </label>
-                  <select
-                    value={linkType}
-                    onChange={(e) => setLinkType(e.target.value as "register" | "update")}
-                    className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-                  >
-                    <option value="register">📝 Registro — nuevo paciente</option>
-                    <option value="update" disabled={!patientId}>🔄 Actualización — paciente existente</option>
-                  </select>
-                </div>
+                {patientId ? (
+                  <div className="flex items-center gap-2 rounded-xl bg-blue-50 border border-blue-200 px-4 py-3">
+                    <span className="text-sm">🔄</span>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">Actualización — paciente existente</p>
+                      <p className="text-xs text-blue-600">El paciente actualizará peso, país y ciudad</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Tipo de formulario
+                    </label>
+                    <select
+                      value={linkType}
+                      onChange={(e) => setLinkType(e.target.value as "register" | "update")}
+                      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      <option value="register">📝 Registro — nuevo paciente</option>
+                      <option value="update" disabled={!patientId}>🔄 Actualización — paciente existente</option>
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
