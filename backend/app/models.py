@@ -183,6 +183,17 @@ class DietVersion(Base):
     diet = relationship("Diet", back_populates="versions")
 
 
+class DietReminder(Base):
+    __tablename__ = "diet_reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    diet_id = Column(Integer, ForeignKey("diets.id"), nullable=False)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    intake_link_id = Column(Integer, ForeignKey("patient_intake_links.id"), nullable=False)
+    sent_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
+    sent_to_email = Column(String(190), nullable=False)
+
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 

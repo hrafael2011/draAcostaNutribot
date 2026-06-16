@@ -46,6 +46,47 @@ async def create_tables() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
+@app.on_event("startup")
+async def start_scheduler():
+    if settings.REMINDER_ENABLED:
+        try:
+            from apscheduler.schedulers.asyncio import AsyncIOScheduler
+            from app.services.reminder_service import check_and_send_reminders
+            from app.core.database import async_session_factory
+
+            scheduler = AsyncIOScheduler()
+
+            async def job():
+                try:
+                    async with async_session_factory() as db:
+                        sent = await check_and_send_reminders(db)
+                        if sent:
+                            logger.info("Enviados %d recordatorios automáticos", sent)
+                        else:
+                            logger.debug("Sin recordatorios pendientes")
+                except Exception:
+                    logger.exception("Error en reminder job")
+
+            # Ejecutar inmediatamente al iniciar
+            await job()
+            # Y repetir cada N minutos
+            scheduler.add_job(
+                job,
+                "interval",
+                minutes=settings.REMINDER_INTERVAL_MINUTES,
+                id="diet_reminders",
+                replace_existing=True,
+            )
+            scheduler.start()
+            logger.info(
+                "Reminder scheduler iniciado (cada %d min, umbral %d días)",
+                settings.REMINDER_INTERVAL_MINUTES,
+                settings.REMINDER_DAYS,
+            )
+        except Exception:
+            logger.exception("No se pudo iniciar el reminder scheduler")
+
+
 @app.get("/")
 async def root():
     return {"status": "ok", "service": "diet-telegram-agent"}

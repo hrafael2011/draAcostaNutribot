@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     )
     # App
     APP_NAME: str = "Diet Telegram Agent"
+    APP_URL: str = ""
     ENV: str = "development"
     PORT: int = 8000
     CORS_ORIGINS: str = "*"
@@ -47,6 +48,17 @@ class Settings(BaseSettings):
 
     # Telegram (legacy — only the feature flag remains)
     TELEGRAM_ENABLED: bool = True
+
+    # Gmail API
+    GMAIL_CLIENT_ID: str = ""
+    GMAIL_CLIENT_SECRET: str = ""
+    GMAIL_REFRESH_TOKEN: str = ""
+    GMAIL_FROM_EMAIL: str = ""
+
+    # Reminders
+    REMINDER_ENABLED: bool = False
+    REMINDER_DAYS: int = 30
+    REMINDER_INTERVAL_MINUTES: int = 5
 
     @property
     def is_production(self) -> bool:

@@ -17,3 +17,4 @@ openai>=1.55.3
 ruff>=0.8.0
 pytest>=8.0.0
 pypdf>=5.0.0
+apscheduler>=3.10,<4
