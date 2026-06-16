@@ -273,15 +273,14 @@ class IntakePublicSubmit(BaseModel):
 
 class IntakeUpdateSubmit(BaseModel):
     """Campos opcionales para actualización de paciente existente vía link.
-    Solo datos personales y medidas — el perfil clínico solo lo modifica el médico."""
+    Sin email (es para contacto/avisos, no se cambia aquí).
+    Sin altura ni datos clínicos (solo el médico modifica eso)."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     whatsapp: Optional[str] = None
-    email: Optional[EmailStr] = None
     country: Optional[str] = None
     city: Optional[str] = None
     weight_kg: Optional[float] = None
-    height_cm: Optional[float] = None
 
 
 class DietGenerateRequest(BaseModel):
