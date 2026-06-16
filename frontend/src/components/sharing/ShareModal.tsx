@@ -27,7 +27,9 @@ const EXPIRATION_OPTIONS = [
 
 export default function ShareModal({ open, onClose, patientId, patientName }: ShareModalProps) {
   const [link, setLink] = useState<IntakeLink | null>(null)
-  const [linkType, setLinkType] = useState<"register" | "update">("register")
+  const [linkType, setLinkType] = useState<"register" | "update">(
+    patientId ? "update" : "register",
+  )
   const [selectedDays, setSelectedDays] = useState(7)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -120,7 +122,9 @@ export default function ShareModal({ open, onClose, patientId, patientName }: Sh
               /* Step 1 — Create */
               <div className="px-6 pb-6 space-y-5">
                 <p className="text-sm text-gray-600 leading-relaxed">
-                  El paciente podrá llenar sus datos personales, historial médico, medidas corporales y preferencias alimentarias.
+                  {linkType === "register"
+                    ? "El paciente llenará sus datos personales y preferencias alimentarias. Luego tú completas la evaluación clínica en consulta."
+                    : "El paciente podrá actualizar su peso, país y ciudad. Ideal para seguimiento mensual."}
                 </p>
 
                 <div>
