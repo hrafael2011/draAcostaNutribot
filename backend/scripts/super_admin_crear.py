@@ -13,7 +13,7 @@ from app.core.security import get_password_hash
 from sqlalchemy import select
 
 async def main():
-    email = os.getenv("EMAIL", "inghendrickrafael.com")
+    email = os.getenv("EMAIL", "inghendrickrafael@gmail.com")
     password = os.getenv("PASSWORD", "cedano@1")
 
     async with AsyncSessionLocal() as db:
