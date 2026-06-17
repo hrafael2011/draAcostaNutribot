@@ -33,10 +33,11 @@ export function setStoredToken(token: string | null) {
   else localStorage.removeItem(TOKEN_KEY)
 }
 
-export async function loginRequest(email: string, password: string) {
+export async function loginRequest(email: string, password: string, portal: "admin" | "doctor" = "doctor") {
   const body = new URLSearchParams()
   body.set("username", email.trim())
   body.set("password", password)
+  body.set("client_secret", portal)  // OAuth2PasswordRequestForm's client_secret used as portal
   const res = await fetch(`${API_BASE_URL}/auth/token`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -270,14 +271,13 @@ export function getAdminDoctors() {
 export function createAdminDoctor(body: {
   full_name: string
   email: string
-  temporary_password: string
   phone?: string | null
   role: "admin" | "doctor"
 }) {
   return authFetch("/admin/doctors", {
     method: "POST",
     body: JSON.stringify(body),
-  }).then((r) => parseJson<DoctorOut>(r))
+  }).then((r) => parseJson<{ generated_password: string } & DoctorOut>(r))
 }
 
 export function updateAdminDoctor(
@@ -298,12 +298,38 @@ export function updateAdminDoctor(
 
 export function resetAdminDoctorPassword(
   doctorId: number,
-  temporaryPassword: string,
 ) {
   return authFetch(`/admin/doctors/${doctorId}/reset-password`, {
     method: "POST",
-    body: JSON.stringify({ temporary_password: temporaryPassword }),
-  }).then((r) => parseJson<DoctorOut>(r))
+  }).then((r) => parseJson<{ generated_password: string }>(r))
+}
+
+export async function forgotPasswordRequest(email: string) {
+  const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+  return parseJson<{ ok: boolean; message: string }>(res)
+}
+
+export async function verifyResetTokenRequest(token: string) {
+  const res = await fetch(
+    `${API_BASE_URL}/auth/verify-reset-token?token=${encodeURIComponent(token)}`,
+  )
+  return parseJson<{ valid: boolean; email?: string }>(res)
+}
+
+export async function resetPasswordRequest(token: string, newPassword: string) {
+  const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  })
+  if (!res.ok) {
+    throw new Error(await readApiError(res) || "Error al restablecer la contraseña")
+  }
+  return parseJson<{ ok: boolean }>(res)
 }
 
 export function getTelegramBinding() {

@@ -21,10 +21,7 @@ export default function AdminUsers() {
     email: "",
     phone: "",
     role: "doctor" as Role,
-    temporary_password: "",
   })
-  const [resetPassword, setResetPassword] = useState("")
-
   const load = useCallback(() => {
     setError(null)
     getAdminDoctors()
@@ -43,7 +40,7 @@ export default function AdminUsers() {
     setError(null)
     setMessage(null)
     try {
-      await createAdminDoctor({
+      const result = await createAdminDoctor({
         ...newDoctor,
         phone: newDoctor.phone || null,
       })
@@ -52,10 +49,11 @@ export default function AdminUsers() {
         email: "",
         phone: "",
         role: "doctor",
-        temporary_password: "",
       })
       setCreating(false)
-      setMessage("Cuenta creada. Al iniciar sesion debera crear su contrasena privada.")
+      setMessage(
+        `Cuenta creada. Contrasena generada: ${result.generated_password}`,
+      )
       load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la cuenta.")
@@ -89,10 +87,9 @@ export default function AdminUsers() {
     setError(null)
     setMessage(null)
     try {
-      await resetAdminDoctorPassword(resetId, resetPassword)
-      setResetPassword("")
+      const { generated_password } = await resetAdminDoctorPassword(resetId)
       setResetId(null)
-      setMessage("Contrasena temporal asignada. El usuario debera cambiarla al entrar.")
+      setMessage(`Contrasena generada: ${generated_password}`)
       load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo resetear la contrasena.")
@@ -175,22 +172,7 @@ export default function AdminUsers() {
               <option value="admin">Admin</option>
             </select>
           </Field>
-          <Field label="Contrasena temporal">
-            <input
-              required
-              type="password"
-              minLength={8}
-              value={newDoctor.temporary_password}
-              onChange={(e) =>
-                setNewDoctor({
-                  ...newDoctor,
-                  temporary_password: e.target.value,
-                })
-              }
-              style={inputStyle}
-            />
-          </Field>
-          <button type="submit">Crear con contrasena temporal</button>
+          <button type="submit">Crear usuario</button>
         </form>
       )}
 
@@ -274,7 +256,6 @@ export default function AdminUsers() {
                     type="button"
                     onClick={() => {
                       setResetId(doctor.id)
-                      setResetPassword("")
                     }}
                   >
                     Reset pass
@@ -299,20 +280,10 @@ export default function AdminUsers() {
         >
           <h2 style={{ fontSize: 18, marginTop: 0 }}>Resetear contrasena</h2>
           <p style={{ color: "#555", fontSize: 14 }}>
-            Esta sera temporal. El usuario debera cambiarla al iniciar sesion.
+            Se generara una nueva contrasena automaticamente.
           </p>
-          <Field label="Nueva contrasena temporal">
-            <input
-              required
-              minLength={8}
-              type="password"
-              value={resetPassword}
-              onChange={(e) => setResetPassword(e.target.value)}
-              style={inputStyle}
-            />
-          </Field>
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit">Asignar temporal</button>
+            <button type="submit">Generar nueva contrasena</button>
             <button type="button" onClick={() => setResetId(null)}>
               Cancelar
             </button>
