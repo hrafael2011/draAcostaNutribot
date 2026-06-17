@@ -3,6 +3,20 @@ from typing import Optional, Any, List, Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class VerifyTokenResponse(BaseModel):
+    valid: bool
+    email: Optional[str] = None
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -50,8 +64,13 @@ class DoctorOut(BaseModel):
     role: str = "doctor"
     must_change_password: bool = False
     is_active: bool
+    created_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminDoctorCreateResponse(DoctorOut):
+    generated_password: str
 
 
 class PatientCreate(BaseModel):
