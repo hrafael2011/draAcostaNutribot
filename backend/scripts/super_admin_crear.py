@@ -13,8 +13,8 @@ from app.core.security import get_password_hash
 from sqlalchemy import select
 
 async def main():
-    email = os.getenv("EMAIL", "admin@nutribot.com")
-    password = os.getenv("PASSWORD", "Admin1234")
+    email = os.getenv("EMAIL", "inghendrickrafael.com")
+    password = os.getenv("PASSWORD", "cedano@1")
 
     async with AsyncSessionLocal() as db:
         existe = (await db.execute(select(Doctor).where(Doctor.email == email))).scalar_one_or_none()
