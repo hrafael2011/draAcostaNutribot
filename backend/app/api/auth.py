@@ -22,6 +22,7 @@ from app.services.auth_email_service import send_password_reset_email
 
 import secrets
 from datetime import timedelta
+import asyncio
 
 router = APIRouter()
 
@@ -197,7 +198,10 @@ async def forgot_password(
         await db.commit()
 
         reset_link = f"{settings.APP_URL}/reset-password?token={token}"
-        send_password_reset_email(doctor.email, doctor.full_name, reset_link)
+        # Fire email in thread to avoid blocking event loop
+        asyncio.ensure_future(
+            asyncio.to_thread(send_password_reset_email, doctor.email, doctor.full_name, reset_link)
+        )
 
     return {"ok": True, "message": "Si el correo existe, recibirás instrucciones"}
 

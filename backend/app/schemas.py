@@ -39,7 +39,7 @@ class PasswordChange(BaseModel):
 class AdminDoctorCreate(BaseModel):
     full_name: str
     email: EmailStr
-    temporary_password: str = Field(min_length=8, max_length=128)
+    temporary_password: Optional[str] = None
     phone: Optional[str] = None
     role: Literal["admin", "doctor"] = "doctor"
 

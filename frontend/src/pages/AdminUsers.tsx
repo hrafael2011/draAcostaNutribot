@@ -8,38 +8,26 @@ import {
 import type { DoctorOut } from "../types"
 import Button from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
-import { Users, Plus, X, Copy, ArrowsClockwise } from "@phosphor-icons/react"
+import { Users, Plus, X, Copy } from "@phosphor-icons/react"
 
 type Role = "admin" | "doctor"
-
-function generatePassword(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-  let result = ""
-  for (let i = 0; i < 10; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
-  }
-  if (!/[A-Z]/.test(result)) result = "A" + result.slice(1)
-  if (!/[0-9]/.test(result)) result = "5" + result.slice(1)
-  return result
-}
 
 export default function AdminUsers() {
   const [doctors, setDoctors] = useState<DoctorOut[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
+  const [lastGeneratedPassword, setLastGeneratedPassword] = useState<string | null>(null)
 
   // Create modal
   const [showCreate, setShowCreate] = useState(false)
   const [createName, setCreateName] = useState("")
   const [createEmail, setCreateEmail] = useState("")
   const [createRole, setCreateRole] = useState<Role>("doctor")
-  const [generatedPassword, setGeneratedPassword] = useState(generatePassword())
   const [creating, setCreating] = useState(false)
 
   // Reset modal
   const [resetDoctor, setResetDoctor] = useState<DoctorOut | null>(null)
-  const [resetGeneratedPass, setResetGeneratedPass] = useState(generatePassword())
   const [resetting, setResetting] = useState(false)
 
   const load = useCallback(() => {
@@ -65,10 +53,10 @@ export default function AdminUsers() {
         email: createEmail,
         role: createRole,
       })
-      setMessage(`Usuario creado. Contraseña: ${result.generated_password}`)
+      setLastGeneratedPassword(result.generated_password)
+      setMessage("Usuario creado exitosamente.")
       setShowCreate(false)
       setCreateName(""); setCreateEmail(""); setCreateRole("doctor")
-      setGeneratedPassword(generatePassword())
       load()
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear el usuario.")
@@ -84,7 +72,8 @@ export default function AdminUsers() {
     setResetting(true)
     try {
       const result = await resetAdminDoctorPassword(resetDoctor.id)
-      setMessage(`Contraseña reseteada para ${resetDoctor.full_name}. Nueva: ${result.generated_password}`)
+      setLastGeneratedPassword(result.generated_password)
+      setMessage(`Contraseña reseteada para ${resetDoctor.full_name}.`)
       setResetDoctor(null)
       load()
     } catch (err) {
@@ -103,7 +92,7 @@ export default function AdminUsers() {
             Gestiona doctores y administradores
           </p>
         </div>
-        <Button onClick={() => { setShowCreate(true); setGeneratedPassword(generatePassword()) }}>
+        <Button onClick={() => setShowCreate(true)}>
           <Plus size={18} className="mr-1" /> Nuevo Usuario
         </Button>
       </div>
@@ -111,6 +100,21 @@ export default function AdminUsers() {
       {message && (
         <div className="mb-4 rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-700 border border-emerald-200">
           {message}
+          {lastGeneratedPassword && (
+            <div className="mt-2 flex items-center gap-2">
+              <code className="rounded bg-white px-2 py-1 font-mono font-bold text-gray-800 border text-xs">
+                {lastGeneratedPassword}
+              </code>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(lastGeneratedPassword || "")}
+                className="text-emerald-600 hover:text-emerald-700"
+                title="Copiar"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+          )}
         </div>
       )}
       {error && (
@@ -129,7 +133,7 @@ export default function AdminUsers() {
         <div className="rounded-xl border border-dashed border-gray-300 p-12 text-center">
           <Users size={48} className="mx-auto mb-3 text-gray-300" />
           <p className="text-gray-500">No hay usuarios registrados</p>
-          <Button className="mt-4" onClick={() => { setShowCreate(true); setGeneratedPassword(generatePassword()) }}>
+          <Button className="mt-4" onClick={() => setShowCreate(true)}>
             Crear primer usuario
           </Button>
         </div>
@@ -182,7 +186,6 @@ export default function AdminUsers() {
                       </Button>
                       <Button variant="secondary" size="sm" onClick={() => {
                         setResetDoctor(doctor)
-                        setResetGeneratedPass(generatePassword())
                       }}>
                         Reset pass
                       </Button>
@@ -230,19 +233,8 @@ export default function AdminUsers() {
                 </select>
               </div>
               <div className="mb-4 rounded-lg bg-amber-50 p-3 border border-amber-200">
-                <div className="mb-1 text-xs text-gray-500">Contraseña generada automáticamente</div>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded bg-white px-2 py-1 text-sm font-mono font-bold text-gray-800 border">
-                    {generatedPassword}
-                  </code>
-                  <button type="button" onClick={() => navigator.clipboard?.writeText(generatedPassword)}
-                    className="rounded p-1 text-gray-400 hover:text-gray-600" title="Copiar">
-                    <Copy size={16} />
-                  </button>
-                  <button type="button" onClick={() => setGeneratedPassword(generatePassword())}
-                    className="rounded p-1 text-gray-400 hover:text-gray-600" title="Regenerar">
-                    <ArrowsClockwise size={16} />
-                  </button>
+                <div className="text-xs text-gray-500">
+                  La contraseña se generará automáticamente y se mostrará al crear el usuario.
                 </div>
               </div>
               <div className="flex justify-end gap-2">
@@ -274,19 +266,8 @@ export default function AdminUsers() {
               ¿Resetear contraseña de <strong>{resetDoctor.full_name}</strong>?
             </p>
             <div className="mb-4 rounded-lg bg-amber-50 p-3 border border-amber-200">
-              <div className="mb-1 text-xs text-gray-500">Nueva contraseña generada</div>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 rounded bg-white px-2 py-1 text-sm font-mono font-bold text-gray-800 border">
-                  {resetGeneratedPass}
-                </code>
-                <button type="button" onClick={() => navigator.clipboard?.writeText(resetGeneratedPass)}
-                  className="rounded p-1 text-gray-400 hover:text-gray-600" title="Copiar">
-                  <Copy size={16} />
-                </button>
-                <button type="button" onClick={() => setResetGeneratedPass(generatePassword())}
-                  className="rounded p-1 text-gray-400 hover:text-gray-600" title="Regenerar">
-                  <ArrowsClockwise size={16} />
-                </button>
+              <div className="text-xs text-gray-500">
+                Se generará una nueva contraseña automáticamente y se mostrará al confirmar.
               </div>
             </div>
             <div className="mb-4 rounded-lg bg-red-50 p-3 text-xs text-red-700 border border-red-200">

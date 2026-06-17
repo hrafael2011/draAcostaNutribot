@@ -6,7 +6,8 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   const location = useLocation()
 
   if (!token) {
-    return <Navigate to="/login" replace state={{ from: location }} />
+    const isAdminRoute = location.pathname.startsWith("/admin")
+    return <Navigate to={isAdminRoute ? "/admin" : "/login"} replace state={{ from: location }} />
   }
   if (session?.mustChangePassword) {
     return <Navigate to="/change-password" replace />
