@@ -370,6 +370,7 @@ export default function PatientDetail() {
     changes: [],
     onConfirm: () => {},
   })
+  const [confirmLoading, setConfirmLoading] = useState(false)
 
   // ── Estado multi-selección del perfil clínico ───────────────────────────
   const [diseasesPills, setDiseasesPills] = useState<string[]>([])
@@ -543,6 +544,7 @@ export default function PatientDetail() {
       open: true,
       changes,
       onConfirm: async () => {
+        setConfirmLoading(true)
         try {
           const pr = await patchProfile(patientId, body)
           setProfile(pr)
@@ -552,6 +554,7 @@ export default function PatientDetail() {
           setError(err instanceof Error ? err.message : "Error")
           addToast(err instanceof Error ? err.message : "Error al guardar", "error")
         } finally {
+          setConfirmLoading(false)
           setConfirmModal({ open: false, changes: [], onConfirm: () => {} })
         }
       },
@@ -1686,6 +1689,7 @@ export default function PatientDetail() {
         onEdit={() => setConfirmModal({ open: false, changes: [], onConfirm: () => {} })}
         confirmLabel="Confirmar cambios"
         editLabel="Continuar editando"
+        loading={confirmLoading}
       />
     </>
   )
