@@ -89,7 +89,11 @@ async def list_doctors(
     db: AsyncSession = Depends(get_db),
     _admin: Doctor = Depends(get_current_admin),
 ):
-    result = await db.execute(select(Doctor).order_by(Doctor.created_at.desc()))
+    result = await db.execute(
+        select(Doctor)
+        .where(Doctor.role != "super_admin")
+        .order_by(Doctor.created_at.desc())
+    )
     return result.scalars().all()
 
 
@@ -108,6 +112,12 @@ async def create_doctor(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only super admins can create admin accounts",
+        )
+    # Super admin can only be created via CLI, never via API
+    if body.role == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Super admin can only be created via CLI",
         )
     generated_password = secrets.token_urlsafe(12)[:12]
     doctor = Doctor(
@@ -154,6 +164,12 @@ async def update_doctor(
 ):
     doctor = await _get_doctor(db, doctor_id)
     data = body.model_dump(exclude_unset=True)
+    # Super admin is immutable via API — manage only via CLI
+    if doctor.role == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin cannot be modified via API",
+        )
     # Regular admin cannot promote any user to admin
     if admin.role != "super_admin" and data.get("role") == "admin":
         raise HTTPException(
@@ -176,6 +192,19 @@ async def update_doctor(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Admin cannot remove their own admin role",
         )
+    # Prevent deactivation or demotion of the last active admin
+    if data.get("is_active") is False or data.get("role") == "doctor":
+        count = await db.execute(
+            select(func.count()).select_from(Doctor).where(
+                Doctor.role.in_(["admin", "super_admin"]),
+                Doctor.is_active == True,
+            )
+        )
+        if count.scalar_one() <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot deactivate or demote the last active admin",
+            )
     if "email" in data and data["email"] is not None:
         data["email"] = str(data["email"]).lower().strip()
     if "full_name" in data and data["full_name"] is not None:
@@ -213,6 +242,12 @@ async def reset_doctor_password(
     admin: Doctor = Depends(get_current_admin),
 ):
     doctor = await _get_doctor(db, doctor_id)
+    # Super admin password can only be reset via CLI, never via API
+    if doctor.role == "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin password cannot be reset via API",
+        )
     # Regular admin cannot reset passwords of other admin accounts
     if admin.role != "super_admin" and doctor.role in ("admin", "super_admin") and doctor.id != admin.id:
         raise HTTPException(
