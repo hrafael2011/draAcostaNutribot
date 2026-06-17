@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +18,70 @@ from app.schemas import (
 )
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# ⚠️  TEMPORARY ENDPOINT — remove after the initial admin account is created.
+# ---------------------------------------------------------------------------
+
+class _SetupAdminRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+
+
+@router.post("/setup", status_code=status.HTTP_201_CREATED)
+async def setup_initial_admin(
+    body: _SetupAdminRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    One-time bootstrap endpoint: creates the first admin account.
+    Rejected with 409 if any admin user already exists, so it is safe to
+    leave deployed briefly — it cannot be used to overwrite an existing admin.
+
+    ⚠️  Remove this endpoint once the initial admin has been created.
+    """
+    # Block if an admin already exists — prevents misuse after initial setup.
+    existing = await db.execute(
+        select(func.count()).select_from(Doctor).where(Doctor.role == "admin")
+    )
+    if existing.scalar_one() > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An admin account already exists. Remove this endpoint.",
+        )
+
+    doctor = Doctor(
+        full_name=body.full_name.strip(),
+        email=body.email.lower().strip(),
+        hashed_password=get_password_hash(body.password),
+        role="admin",
+        is_active=True,
+        must_change_password=False,
+    )
+    db.add(doctor)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered.",
+        )
+    await db.refresh(doctor)
+    return {
+        "message": "Admin account created successfully. Remove /api/admin/setup now.",
+        "id": doctor.id,
+        "email": doctor.email,
+        "full_name": doctor.full_name,
+        "role": doctor.role,
+    }
+
+
+# ---------------------------------------------------------------------------
+# End of temporary endpoint
+# ---------------------------------------------------------------------------
 
 
 @router.get("/doctors", response_model=list[DoctorOut])
