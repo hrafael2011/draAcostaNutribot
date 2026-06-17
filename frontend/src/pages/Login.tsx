@@ -10,7 +10,11 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const [forgotOpen, setForgotOpen] = useState(false)
+  const [forgotEmail, setForgotEmail] = useState("")
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null)
+  const [forgotLoading, setForgotLoading] = useState(false)
+  const { login, forgotPassword } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -21,12 +25,26 @@ export default function Login() {
     setError("")
     setLoading(true)
     try {
-      await login(email, password)
+      await login(email, password, "doctor")
       navigate(from, { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleForgotSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    setForgotLoading(true)
+    setForgotMessage(null)
+    try {
+      const result = await forgotPassword(forgotEmail)
+      setForgotMessage(result.message)
+    } catch {
+      setForgotMessage("Si el correo existe, recibirás instrucciones")
+    } finally {
+      setForgotLoading(false)
     }
   }
 
@@ -97,7 +115,66 @@ export default function Login() {
           <Button type="submit" disabled={loading} className="w-full">
             {loading ? "Iniciando sesión..." : "Iniciar sesión"}
           </Button>
+
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={() => setForgotOpen(true)}
+              className="text-sm text-emerald-600 hover:text-emerald-700 hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
         </form>
+
+        {/* Forgot password modal */}
+        {forgotOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+            onClick={() => setForgotOpen(false)}
+          >
+            <div
+              className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="mb-2 text-lg font-bold text-gray-800">
+                Recuperar contraseña
+              </h2>
+              <p className="mb-4 text-sm text-gray-500">
+                Ingresa tu correo y te enviaremos un enlace para restablecer tu contraseña.
+              </p>
+              {forgotMessage ? (
+                <>
+                  <div className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    {forgotMessage}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={() => { setForgotOpen(false); setForgotMessage(null); }}
+                    className="w-full"
+                  >
+                    Cerrar
+                  </Button>
+                </>
+              ) : (
+                <form onSubmit={handleForgotSubmit}>
+                  <input
+                    type="email"
+                    required
+                    value={forgotEmail}
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    placeholder="doctora@ejemplo.com"
+                    className="mb-4 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
+                      focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <Button type="submit" disabled={forgotLoading} className="w-full">
+                    {forgotLoading ? "Enviando..." : "Enviar enlace"}
+                  </Button>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
