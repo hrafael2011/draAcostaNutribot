@@ -177,9 +177,14 @@ async def list_audit_logs(
     db: AsyncSession = Depends(get_db),
     admin: Doctor = Depends(get_current_admin),
 ):
-    """Devuelve el historial de acciones de administración."""
-    q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(100)
-    # Regular admin sees only doctor-related logs
+    """Devuelve el historial de acciones de administración (solo gestión de usuarios)."""
+    q = (
+        select(AuditLog)
+        .where(AuditLog.entity_type == "doctor")
+        .order_by(AuditLog.created_at.desc())
+        .limit(100)
+    )
+    # Regular admin sees only their own actions
     if admin.role != "super_admin":
         q = q.where(AuditLog.doctor_id == admin.id)
     result = await db.execute(q)
@@ -187,7 +192,7 @@ async def list_audit_logs(
 
     # Enrich with admin and target info
     admin_ids = {l.doctor_id for l in logs}
-    admins = {d.id: d for d in (await db.execute(select(Doctor).where(Doctor.id.in_(admin_ids)))).scalars()}
+    admins = {d.id: d for d in (await db.execute(select(Doctor).where(Doctor.id.in_(admin_ids)))).scalars()} if admin_ids else {}
     target_ids = {l.entity_id for l in logs if l.entity_id}
     targets = {d.id: d for d in (await db.execute(select(Doctor).where(Doctor.id.in_(target_ids)))).scalars()} if target_ids else {}
 
@@ -195,9 +200,9 @@ async def list_audit_logs(
         {
             "id": log.id,
             "fecha": log.created_at.isoformat(),
-            "admin": admins[log.doctor_id].full_name if log.doctor_id in admins else "Desconocido",
+            "admin": admins[log.doctor_id].full_name if log.doctor_id in admins else "—",
             "accion": log.action,
-            "usuario_afectado": targets[log.entity_id].full_name if log.entity_id in targets else "Desconocido",
+            "usuario_afectado": targets[log.entity_id].full_name if log.entity_id in targets else "—",
             "detalle": log.payload_json or {},
         }
         for log in logs
