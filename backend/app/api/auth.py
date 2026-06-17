@@ -91,6 +91,18 @@ async def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Inactive account",
         )
+    # Portal validation
+    portal = form_data.client_secret or "doctor"
+    if portal == "admin" and doctor.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to administrators",
+        )
+    if portal == "doctor" and doctor.role != "doctor":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access restricted to doctors",
+        )
     role = doctor.role or "doctor"
     must_change_password = bool(doctor.must_change_password)
     token = create_access_token(
