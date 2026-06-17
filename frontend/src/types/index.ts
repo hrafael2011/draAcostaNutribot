@@ -121,6 +121,7 @@ export type DoctorOut = {
   is_active: boolean
   telegram_user_id?: string | null
   telegram_username?: string | null
+  created_at?: string | null
 }
 
 export type TelegramBindingState = {
