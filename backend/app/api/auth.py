@@ -94,12 +94,12 @@ async def login(
         )
     # Portal validation
     portal = form_data.client_secret or "doctor"
-    if portal == "admin" and doctor.role != "admin":
+    if portal == "admin" and doctor.role not in ("admin", "super_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access restricted to administrators",
         )
-    if portal == "doctor" and doctor.role != "doctor":
+    if portal == "doctor" and doctor.role not in ("doctor",):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access restricted to doctors",

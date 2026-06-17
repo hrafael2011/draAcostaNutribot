@@ -106,7 +106,7 @@ export default function AdminLayout() {
   const handleLogout = () => {
     const role = doctor?.role
     logout()
-    navigate(role === "admin" ? "/admin" : "/login", { replace: true })
+    navigate(role === "admin" || role === "super_admin" ? "/admin" : "/login", { replace: true })
   }
 
   const isActive = (to: string) => {
@@ -115,7 +115,8 @@ export default function AdminLayout() {
   }
 
   const breadcrumbs = getBreadcrumbs(location.pathname)
-  const allNavItems = doctor?.role === "admin" ? [ADMIN_ITEM] : [...NAV_ITEMS]
+  const isAdminUser = doctor?.role === "admin" || doctor?.role === "super_admin"
+  const allNavItems = isAdminUser ? [ADMIN_ITEM] : [...NAV_ITEMS]
 
   return (
     <div className="flex min-h-[100dvh] bg-slate-50">

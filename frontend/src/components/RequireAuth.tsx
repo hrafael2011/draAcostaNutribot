@@ -13,9 +13,11 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
     return <Navigate to="/change-password" replace />
   }
 
+  const isAdmin = session?.role === "admin" || session?.role === "super_admin"
+
   // Block non-admin users from admin routes
   const isAdminRoute = location.pathname.startsWith("/admin")
-  if (isAdminRoute && session?.role !== "admin") {
+  if (isAdminRoute && !isAdmin) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
         <div className="text-center">
@@ -27,7 +29,7 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
   }
 
   // Redirect admins away from doctor routes
-  if (session?.role === "admin" && !isAdminRoute) {
+  if (isAdmin && !isAdminRoute) {
     return <Navigate to="/admin/users" replace />
   }
 
