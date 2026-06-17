@@ -5,6 +5,8 @@ import type { IntakePublicMeta } from "../types"
 import DatePicker from "../components/ui/DatePicker"
 import LocationSelector from "../components/LocationSelector"
 import { OBJECTIVE_OPTIONS } from "../constants/objectives"
+import ConfirmModal from "../components/ui/ConfirmModal"
+import type { ChangeItem } from "../components/ui/ConfirmModal"
 
 export default function PublicIntake() {
   const { token } = useParams()
@@ -17,6 +19,10 @@ export default function PublicIntake() {
   const [birthDate, setBirthDate] = useState("")
   const [weightKg, setWeightKg] = useState("")
   const [objective, setObjective] = useState("")
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmChanges, setConfirmChanges] = useState<ChangeItem[]>([])
+  const [confirmLoading, setConfirmLoading] = useState(false)
+  const [pendingBody, setPendingBody] = useState<Record<string, unknown> | null>(null)
 
   useEffect(() => {
     if (!token) return
@@ -61,16 +67,29 @@ export default function PublicIntake() {
       if (country) updateBody.country = country
       if (city) updateBody.city = city
       if (Number.isFinite(weight_kg)) updateBody.weight_kg = weight_kg
-      try {
-        await updateIntakeForm(token, updateBody)
-        setDone(true)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Update failed")
+
+      // Check if there are actual changes
+      if (Object.keys(updateBody).length === 0) {
+        setError("No hay cambios para guardar")
+        return
       }
+
+      // Show modal instead of direct submit
+      const changes: ChangeItem[] = []
+      if (firstName) changes.push({ label: "Nombre", newValue: firstName, isNew: true })
+      if (lastName) changes.push({ label: "Apellido", newValue: lastName, isNew: true })
+      if (updateBody.whatsapp) changes.push({ label: "WhatsApp", newValue: String(updateBody.whatsapp), isNew: true })
+      if (updateBody.country) changes.push({ label: "País", newValue: String(updateBody.country), isNew: true })
+      if (updateBody.city) changes.push({ label: "Ciudad", newValue: String(updateBody.city), isNew: true })
+      if (updateBody.weight_kg) changes.push({ label: "Peso", newValue: String(updateBody.weight_kg), isNew: true })
+
+      setPendingBody(updateBody)
+      setConfirmChanges(changes)
+      setConfirmOpen(true)
       return
     }
 
-    // Register flow — solo datos personales + disliked_foods
+    // Register flow — show confirmation first
     const body: Record<string, unknown> = {
       first_name: str("first_name"),
       last_name: str("last_name"),
@@ -87,11 +106,53 @@ export default function PublicIntake() {
       setError("País y ciudad son obligatorios")
       return
     }
+
+    // Build changes for the modal
+    const changes: ChangeItem[] = [
+      { label: "Nombre", newValue: `${str("first_name")} ${str("last_name")}`, isNew: true },
+      { label: "Fecha de nacimiento", newValue: birthDate, isNew: true },
+      { label: "Sexo", newValue: str("sex"), isNew: true },
+      { label: "País", newValue: country, isNew: true },
+      { label: "Ciudad", newValue: city, isNew: true },
+      { label: "Objetivo", newValue: objective, isNew: true },
+    ]
+    if (str("whatsapp")) changes.push({ label: "WhatsApp", newValue: str("whatsapp"), isNew: true })
+    if (str("email")) changes.push({ label: "Email", newValue: str("email"), isNew: true })
+    if (str("disliked_foods")) changes.push({ label: "Alimentos que no le gustan", newValue: str("disliked_foods"), isNew: true })
+
+    setPendingBody(body)
+    setConfirmChanges(changes)
+    setConfirmOpen(true)
+    return
+  }
+
+  async function handleRegisterConfirm() {
+    if (!pendingBody || !token) return
+    setConfirmLoading(true)
     try {
-      await submitIntakeForm(token, body)
+      await submitIntakeForm(token, pendingBody)
       setDone(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed")
+    } finally {
+      setConfirmLoading(false)
+      setConfirmOpen(false)
+      setPendingBody(null)
+    }
+  }
+
+  async function handleUpdateConfirm() {
+    if (!pendingBody || !token) return
+    setConfirmLoading(true)
+    try {
+      await updateIntakeForm(token, pendingBody)
+      setDone(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Update failed")
+    } finally {
+      setConfirmLoading(false)
+      setConfirmOpen(false)
+      setPendingBody(null)
     }
   }
 
@@ -287,6 +348,17 @@ export default function PublicIntake() {
           </form>
         )}
       </div>
+      <ConfirmModal
+        open={confirmOpen}
+        title="Revisa tus datos"
+        description="Confirmá que toda tu información sea correcta antes de enviarla."
+        changes={confirmChanges}
+        onConfirm={linkType === "register" ? handleRegisterConfirm : handleUpdateConfirm}
+        onEdit={() => { setConfirmOpen(false); setPendingBody(null) }}
+        confirmLabel="Confirmar y enviar"
+        editLabel="Corregir"
+        loading={confirmLoading}
+      />
     </div>
   )
 }
