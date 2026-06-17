@@ -6,6 +6,7 @@ import AdminLogin from "./pages/AdminLogin"
 import ChangePassword from "./pages/ChangePassword"
 import ResetPassword from "./pages/ResetPassword"
 import AdminUsers from "./pages/AdminUsers"
+import AdminAuditLog from "./pages/AdminAuditLog"
 import Dashboard from "./pages/Dashboard"
 import Patients from "./pages/Patients"
 import PatientDetail from "./pages/PatientDetail"
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="diets/:dietId" element={<DietDetail />} />
         <Route path="trash" element={<Trash />} />
         <Route path="admin/users" element={<AdminUsers />} />
+        <Route path="admin/audit-log" element={<AdminAuditLog />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

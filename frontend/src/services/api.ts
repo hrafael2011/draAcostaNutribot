@@ -15,6 +15,7 @@ import type {
   TelegramBindStart,
   TelegramBindingState,
   DietStrategyMode,
+  AuditLogEntry,
   DoctorOut,
 } from "../types"
 import { notifyUnauthorized } from "./authBridge"
@@ -294,6 +295,12 @@ export function updateAdminDoctor(
     method: "PATCH",
     body: JSON.stringify(body),
   }).then((r) => parseJson<DoctorOut>(r))
+}
+
+export function getAuditLogs() {
+  return authFetch("/admin/audit-log").then((r) =>
+    parseJson<AuditLogEntry[]>(r),
+  )
 }
 
 export function resetAdminDoctorPassword(

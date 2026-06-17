@@ -124,6 +124,15 @@ export type DoctorOut = {
   created_at?: string | null
 }
 
+export type AuditLogEntry = {
+  id: number
+  fecha: string
+  admin: string
+  accion: string
+  usuario_afectado: string
+  detalle: Record<string, unknown>
+}
+
 export type TelegramBindingState = {
   linked: boolean
   telegram_user_id?: string | null

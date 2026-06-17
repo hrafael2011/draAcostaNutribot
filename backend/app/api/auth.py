@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
@@ -8,6 +8,7 @@ from app.core.database import get_db
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.core.config import settings
 from app.api.deps import get_current_active_doctor
+from app.core.limiter import limiter
 from app.models import Doctor, PasswordResetToken, utcnow
 from app.schemas import (
     DoctorCreate,
@@ -74,7 +75,9 @@ async def register_doctor(body: DoctorCreate, db: AsyncSession = Depends(get_db)
 
 
 @router.post("/token", response_model=Token)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
@@ -171,7 +174,9 @@ async def logout():
 
 
 @router.post("/forgot-password")
+@limiter.limit("2/10minute")
 async def forgot_password(
+    request: Request,
     body: ForgotPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):
@@ -232,7 +237,9 @@ async def verify_reset_token(
 
 
 @router.post("/reset-password")
+@limiter.limit("5/hour")
 async def reset_password(
+    request: Request,
     body: ResetPasswordRequest,
     db: AsyncSession = Depends(get_db),
 ):

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_admin
 from app.core.database import get_db
 from app.core.security import get_password_hash
-from app.models import Doctor, utcnow
+from app.models import AuditLog, Doctor, utcnow
 import secrets
 
 from app.schemas import (
@@ -64,6 +64,9 @@ async def create_doctor(
             detail="Email already registered",
         )
     await db.refresh(doctor)
+    await _log_admin_action(db, admin,
+        f"Creó el usuario {doctor.full_name} ({doctor.role})",
+        doctor, {"full_name": doctor.full_name, "email": doctor.email, "role": doctor.role})
     return AdminDoctorCreateResponse(
         id=doctor.id,
         full_name=doctor.full_name,
@@ -124,6 +127,10 @@ async def update_doctor(
             detail="Email already registered",
         )
     await db.refresh(doctor)
+    changes = [f"{k} actualizado" for k in data]
+    await _log_admin_action(db, admin,
+        f"Actualizó datos de {doctor.full_name}: {', '.join(changes)}" if changes else f"Actualizó datos de {doctor.full_name}",
+        doctor, {"changes": list(data.keys())})
     return doctor
 
 
@@ -146,7 +153,55 @@ async def reset_doctor_password(
     doctor.updated_at = utcnow()
     await db.commit()
     await db.refresh(doctor)
+    await _log_admin_action(db, admin,
+        f"Reseteó la contraseña de {doctor.full_name}",
+        doctor)
     return {"generated_password": generated_password}
+
+
+async def _log_admin_action(db: AsyncSession, admin: Doctor, action: str, target: Doctor, details: dict | None = None):
+    """Register an audit log entry for an admin action."""
+    log = AuditLog(
+        doctor_id=admin.id,
+        action=action,
+        entity_type="doctor",
+        entity_id=target.id,
+        payload_json=details or {},
+    )
+    db.add(log)
+    await db.commit()
+
+
+@router.get("/audit-log")
+async def list_audit_logs(
+    db: AsyncSession = Depends(get_db),
+    admin: Doctor = Depends(get_current_admin),
+):
+    """Devuelve el historial de acciones de administración."""
+    q = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(100)
+    # Regular admin sees only doctor-related logs
+    if admin.role != "super_admin":
+        q = q.where(AuditLog.doctor_id == admin.id)
+    result = await db.execute(q)
+    logs = result.scalars().all()
+
+    # Enrich with admin and target info
+    admin_ids = {l.doctor_id for l in logs}
+    admins = {d.id: d for d in (await db.execute(select(Doctor).where(Doctor.id.in_(admin_ids)))).scalars()}
+    target_ids = {l.entity_id for l in logs if l.entity_id}
+    targets = {d.id: d for d in (await db.execute(select(Doctor).where(Doctor.id.in_(target_ids)))).scalars()} if target_ids else {}
+
+    return [
+        {
+            "id": log.id,
+            "fecha": log.created_at.isoformat(),
+            "admin": admins[log.doctor_id].full_name if log.doctor_id in admins else "Desconocido",
+            "accion": log.action,
+            "usuario_afectado": targets[log.entity_id].full_name if log.entity_id in targets else "Desconocido",
+            "detalle": log.payload_json or {},
+        }
+        for log in logs
+    ]
 
 
 async def _get_doctor(db: AsyncSession, doctor_id: int) -> Doctor:

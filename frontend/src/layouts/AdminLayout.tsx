@@ -12,6 +12,7 @@ import {
   X,
   Trash,
   CaretRight,
+  ClipboardText,
   type Icon,
 } from "@phosphor-icons/react"
 import { useAuth } from "../context/AuthContext"
@@ -29,7 +30,10 @@ const NAV_ITEMS = [
   { to: "/trash", label: "Papelera", icon: Trash },
 ]
 
-const ADMIN_ITEM = { to: "/admin/users", label: "Administración", icon: Gear }
+const ADMIN_ITEMS = [
+  { to: "/admin/users", label: "Usuarios", icon: Gear },
+  { to: "/admin/audit-log", label: "Auditoría", icon: ClipboardText },
+]
 
 const BREADCRUMB_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
@@ -38,7 +42,9 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   "diets/new": "Nueva Dieta",
   formularios: "Formularios",
   "intake-links": "Formularios",
-  "admin/users": "Administración",
+  "/admin": "Admin",
+  "/admin/users": "Usuarios",
+  "/admin/audit-log": "Auditoría",
   trash: "Papelera",
 }
 
@@ -116,7 +122,7 @@ export default function AdminLayout() {
 
   const breadcrumbs = getBreadcrumbs(location.pathname)
   const isAdminUser = doctor?.role === "admin" || doctor?.role === "super_admin"
-  const allNavItems = isAdminUser ? [ADMIN_ITEM] : [...NAV_ITEMS]
+  const allNavItems = isAdminUser ? ADMIN_ITEMS : [...NAV_ITEMS]
 
   return (
     <div className="flex min-h-[100dvh] bg-slate-50">
