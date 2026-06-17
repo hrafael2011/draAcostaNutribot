@@ -29,6 +29,7 @@ export default function AdminUsers() {
   // Reset modal
   const [resetDoctor, setResetDoctor] = useState<DoctorOut | null>(null)
   const [resetting, setResetting] = useState(false)
+  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all")
 
   const load = useCallback(() => {
     setError(null)
@@ -138,6 +139,22 @@ export default function AdminUsers() {
           </Button>
         </div>
       ) : (
+        <>
+        <div className="mb-3 flex gap-2">
+          {(["all", "active", "inactive"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                filter === f
+                  ? "bg-emerald-600 text-white"
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {f === "all" ? "Todos" : f === "active" ? "Activos" : "Inactivos"}
+            </button>
+          ))}
+        </div>
         <div className="overflow-x-auto rounded-xl border border-gray-200">
           <table className="w-full text-sm">
             <thead>
@@ -151,7 +168,9 @@ export default function AdminUsers() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {doctors.map((doctor) => (
+              {doctors
+                .filter((d) => filter === "all" || (filter === "active" ? d.is_active : !d.is_active))
+                .map((doctor) => (
                 <tr key={doctor.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-800">{doctor.full_name}</td>
                   <td className="px-4 py-3 text-gray-500">{doctor.email}</td>
@@ -196,6 +215,7 @@ export default function AdminUsers() {
             </tbody>
           </table>
         </div>
+        </>
       )}
 
       {/* Create modal */}
