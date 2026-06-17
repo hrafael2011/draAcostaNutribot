@@ -127,10 +127,17 @@ async def update_doctor(
             detail="Email already registered",
         )
     await db.refresh(doctor)
-    changes = [f"{k} actualizado" for k in data]
-    await _log_admin_action(db, admin,
-        f"Actualizó datos de {doctor.full_name}: {', '.join(changes)}" if changes else f"Actualizó datos de {doctor.full_name}",
-        doctor, {"changes": list(data.keys())})
+    # Generate a human-readable action description
+    if "is_active" in data:
+        action = f"Activó a {doctor.full_name}" if data["is_active"] else f"Desactivó a {doctor.full_name}"
+    elif data.keys() == {"full_name"}:
+        action = f"Actualizó el nombre de {doctor.full_name}"
+    elif data.keys() == {"role"}:
+        action = f"Cambió el rol de {doctor.full_name}"
+    else:
+        action = f"Actualizó datos de {doctor.full_name}"
+    changes_str = ", ".join(k.replace("_", " ") for k in data)
+    await _log_admin_action(db, admin, action, doctor, {"cambios": changes_str if changes_str else None})
     return doctor
 
 
@@ -178,9 +185,17 @@ async def list_audit_logs(
     admin: Doctor = Depends(get_current_admin),
 ):
     """Devuelve el historial de acciones de administración (solo gestión de usuarios)."""
+    admin_actions = [
+        "Creó el usuario", "Actualizó datos de", "Reseteó la contraseña de",
+        "Activó a", "Desactivó a",
+    ]
+    from sqlalchemy import or_
     q = (
         select(AuditLog)
-        .where(AuditLog.entity_type == "doctor")
+        .where(
+            AuditLog.entity_type == "doctor",
+            or_(AuditLog.action.like(f"{a}%") for a in admin_actions)
+        )
         .order_by(AuditLog.created_at.desc())
         .limit(100)
     )
