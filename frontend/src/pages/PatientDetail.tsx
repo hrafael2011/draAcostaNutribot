@@ -17,6 +17,8 @@ import NoAplicaField from "../components/ui/NoAplicaField"
 import WeightInput from "../components/ui/WeightInput"
 import HeightInput from "../components/ui/HeightInput"
 import { OBJECTIVE_OPTIONS } from "../constants/objectives"
+import ConfirmModal from "../components/ui/ConfirmModal"
+import type { ChangeItem } from "../components/ui/ConfirmModal"
 
 // ── Opciones predefinidas ───────────────────────────────────────────────────
 
@@ -285,6 +287,44 @@ function PillSelect({
   )
 }
 
+// ── Etiquetas para el modal de confirmación ─────────────────────────────────
+
+const profileLabels: Record<string, string> = {
+  objective: "Objetivo",
+  diseases: "Enfermedades",
+  medications: "Medicamentos",
+  food_allergies: "Alergias alimentarias",
+  foods_avoided: "Alimentos a evitar",
+  medical_history: "Historial médico",
+  dietary_style: "Estilo de alimentación",
+  food_preferences: "Alimentos que le gustan",
+  disliked_foods: "Alimentos que NO le gustan",
+  water_intake_liters: "Agua (L/día)",
+  activity_level: "Actividad física",
+  stress_level: "Estrés",
+  sleep_quality: "Calidad del sueño",
+  sleep_hours: "Horas de sueño",
+  budget_level: "Presupuesto",
+  adherence_level: "Adherencia",
+  exercise_frequency_per_week: "Ejercicio (días/sem)",
+  exercise_type: "Tipo de ejercicio",
+  extra_notes: "Notas adicionales",
+  weight_kg: "Peso",
+  height_cm: "Altura",
+  neck_cm: "Cuello",
+  chest_cm: "Pecho",
+  waist_cm: "Cintura",
+  hip_cm: "Cadera",
+  leg_cm: "Pierna",
+  calf_cm: "Pantorrilla",
+  first_name: "Nombre",
+  last_name: "Apellido",
+  whatsapp: "WhatsApp",
+  email: "Email",
+  country: "País",
+  city: "Ciudad",
+}
+
 // ── Componente principal ────────────────────────────────────────────────────
 
 export default function PatientDetail() {
@@ -319,6 +359,17 @@ export default function PatientDetail() {
   // Form keys to force re-mount with fresh defaults
   const [dataFormKey, setDataFormKey] = useState(0)
   const [profileFormKey, setProfileFormKey] = useState(0)
+
+  // ── Modal de confirmación ───────────────────────────────────────────────
+  const [confirmModal, setConfirmModal] = useState<{
+    open: boolean
+    changes: ChangeItem[]
+    onConfirm: () => void
+  }>({
+    open: false,
+    changes: [],
+    onConfirm: () => {},
+  })
 
   // ── Estado multi-selección del perfil clínico ───────────────────────────
   const [diseasesPills, setDiseasesPills] = useState<string[]>([])
@@ -435,47 +486,76 @@ export default function PatientDetail() {
     }
   }
 
-  async function onSaveProfile(e: FormEvent) {
+  function onSaveProfile(e: FormEvent) {
     e.preventDefault()
     setError(null)
-    try {
-      const form = e.target as HTMLFormElement
-      const fd = new FormData(form)
-      const num = (k: string) => {
-        const v = fd.get(k) as string
-        if (!v) return null
-        const n = Number(v)
-        return Number.isFinite(n) ? n : null
-      }
-      const body: Record<string, unknown> = {
-        objective: (fd.get("objective") as string) || null,
-        diseases: buildMultiValue(diseasesPills, diseasesOther),
-        medications: (fd.get("medications") as string) || null,
-        food_allergies: buildMultiValue(allergiesPills, allergiesOther),
-        foods_avoided: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),
-        medical_history: (fd.get("medical_history") as string) || null,
-        dietary_style: buildMultiValue(dietaryPills, dietaryOther),
-        food_preferences: (fd.get("food_preferences") as string) || null,
-        disliked_foods: (fd.get("disliked_foods") as string) || null,
-        water_intake_liters: num("water_intake_liters"),
-        activity_level: (fd.get("activity_level") as string) || null,
-        stress_level: num("stress_level"),
-        sleep_quality: num("sleep_quality"),
-        sleep_hours: num("sleep_hours"),
-        budget_level: (fd.get("budget_level") as string) || null,
-        adherence_level: num("adherence_level"),
-        exercise_frequency_per_week: num("exercise_frequency_per_week"),
-        exercise_type: buildMultiValue(exerciseTypePills, exerciseTypeOther),
-        extra_notes: (fd.get("extra_notes") as string) || null,
-      }
-      const pr = await patchProfile(patientId, body)
-      setProfile(pr)
-      setEditingProfile(false)
-      addToast("Perfil guardado", "success")
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error")
-      addToast(err instanceof Error ? err.message : "Error al guardar", "error")
+    const form = e.target as HTMLFormElement
+    const fd = new FormData(form)
+    const num = (k: string) => {
+      const v = fd.get(k) as string
+      if (!v) return null
+      const n = Number(v)
+      return Number.isFinite(n) ? n : null
     }
+    const body: Record<string, unknown> = {
+      objective: (fd.get("objective") as string) || null,
+      diseases: buildMultiValue(diseasesPills, diseasesOther),
+      medications: (fd.get("medications") as string) || null,
+      food_allergies: buildMultiValue(allergiesPills, allergiesOther),
+      foods_avoided: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),
+      medical_history: (fd.get("medical_history") as string) || null,
+      dietary_style: buildMultiValue(dietaryPills, dietaryOther),
+      food_preferences: (fd.get("food_preferences") as string) || null,
+      disliked_foods: (fd.get("disliked_foods") as string) || null,
+      water_intake_liters: num("water_intake_liters"),
+      activity_level: (fd.get("activity_level") as string) || null,
+      stress_level: num("stress_level"),
+      sleep_quality: num("sleep_quality"),
+      sleep_hours: num("sleep_hours"),
+      budget_level: (fd.get("budget_level") as string) || null,
+      adherence_level: num("adherence_level"),
+      exercise_frequency_per_week: num("exercise_frequency_per_week"),
+      exercise_type: buildMultiValue(exerciseTypePills, exerciseTypeOther),
+      extra_notes: (fd.get("extra_notes") as string) || null,
+    }
+
+    const changes: ChangeItem[] = []
+    for (const [key, newVal] of Object.entries(body)) {
+      const label = profileLabels[key] ?? key
+      const oldVal = profile?.[key as keyof PatientProfile]
+      const newStr = newVal == null ? "" : String(newVal)
+      const oldStr = oldVal == null ? "" : String(oldVal)
+      if (newStr !== oldStr) {
+        changes.push({
+          label,
+          oldValue: oldStr || undefined,
+          newValue: newStr || "—",
+        })
+      }
+    }
+
+    if (changes.length === 0) {
+      addToast("Sin cambios que guardar", "info")
+      return
+    }
+
+    setConfirmModal({
+      open: true,
+      changes,
+      onConfirm: async () => {
+        try {
+          const pr = await patchProfile(patientId, body)
+          setProfile(pr)
+          setEditingProfile(false)
+          addToast("Perfil guardado", "success")
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Error")
+          addToast(err instanceof Error ? err.message : "Error al guardar", "error")
+        } finally {
+          setConfirmModal({ open: false, changes: [], onConfirm: () => {} })
+        }
+      },
+    })
   }
 
   async function onAddMetric(e: FormEvent) {
@@ -622,6 +702,7 @@ export default function PatientDetail() {
   }
 
   return (
+    <>
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
       {/* ── Error banner ──────────────────────────────────────────────── */}
       {error && (
@@ -1595,5 +1676,17 @@ export default function PatientDetail() {
         </div>
       </div>
     </div>
+
+      <ConfirmModal
+        open={confirmModal.open}
+        title="Revisar cambios"
+        description="Confirma los cambios que realizaste en el perfil del paciente."
+        changes={confirmModal.changes}
+        onConfirm={confirmModal.onConfirm}
+        onEdit={() => setConfirmModal({ open: false, changes: [], onConfirm: () => {} })}
+        confirmLabel="Confirmar cambios"
+        editLabel="Continuar editando"
+      />
+    </>
   )
 }
