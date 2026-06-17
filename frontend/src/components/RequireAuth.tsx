@@ -26,5 +26,10 @@ export default function RequireAuth({ children }: { children: React.ReactNode })
     )
   }
 
+  // Redirect admins away from doctor routes
+  if (session?.role === "admin" && !isAdminRoute) {
+    return <Navigate to="/admin/users" replace />
+  }
+
   return <>{children}</>
 }
