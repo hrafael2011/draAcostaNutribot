@@ -9,6 +9,7 @@ import type { DoctorOut } from "../types"
 import Button from "../components/ui/Button"
 import { Badge } from "../components/ui/Badge"
 import { Users, Plus, X, Copy } from "@phosphor-icons/react"
+import { useAuth } from "../context/AuthContext"
 
 type Role = "admin" | "doctor"
 
@@ -30,6 +31,8 @@ export default function AdminUsers() {
   const [resetDoctor, setResetDoctor] = useState<DoctorOut | null>(null)
   const [resetting, setResetting] = useState(false)
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all")
+  const { session: currentSession } = useAuth()
+  const isSuperAdmin = currentSession?.role === "super_admin"
 
   const load = useCallback(() => {
     setError(null)
@@ -170,13 +173,14 @@ export default function AdminUsers() {
             <tbody className="divide-y divide-gray-100">
               {doctors
                 .filter((d) => filter === "all" || (filter === "active" ? d.is_active : !d.is_active))
+                .filter((d) => isSuperAdmin || d.role !== "admin")
                 .map((doctor) => (
                 <tr key={doctor.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 font-medium text-gray-800">{doctor.full_name}</td>
                   <td className="px-4 py-3 text-gray-500">{doctor.email}</td>
                   <td className="px-4 py-3">
-                    <Badge variant={doctor.role === "admin" ? "neutral" : "info"}>
-                      {doctor.role === "admin" ? "Admin" : "Doctor"}
+                    <Badge variant={doctor.role === "admin" || doctor.role === "super_admin" ? "neutral" : "info"}>
+                      {doctor.role === "super_admin" ? "Super Admin" : doctor.role === "admin" ? "Admin" : "Doctor"}
                     </Badge>
                   </td>
                   <td className="px-4 py-3">
@@ -249,7 +253,7 @@ export default function AdminUsers() {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
                     focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500">
                   <option value="doctor">Doctor</option>
-                  <option value="admin">Admin</option>
+                  {isSuperAdmin && <option value="admin">Admin</option>}
                 </select>
               </div>
               <div className="mb-4 rounded-lg bg-amber-50 p-3 border border-amber-200">

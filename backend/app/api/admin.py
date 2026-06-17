@@ -36,8 +36,14 @@ async def list_doctors(
 async def create_doctor(
     body: AdminDoctorCreate,
     db: AsyncSession = Depends(get_db),
-    _admin: Doctor = Depends(get_current_admin),
+    admin: Doctor = Depends(get_current_admin),
 ):
+    # Only super_admin can create admin accounts
+    if body.role == "admin" and admin.role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can create admin accounts",
+        )
     generated_password = secrets.token_urlsafe(12)[:12]
     doctor = Doctor(
         full_name=body.full_name.strip(),
@@ -79,6 +85,12 @@ async def update_doctor(
     admin: Doctor = Depends(get_current_admin),
 ):
     doctor = await _get_doctor(db, doctor_id)
+    # Regular admin cannot modify other admin accounts
+    if admin.role != "super_admin" and doctor.role in ("admin", "super_admin") and doctor.id != admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can modify other admin accounts",
+        )
     data = body.model_dump(exclude_unset=True)
     if doctor.id == admin.id and data.get("is_active") is False:
         raise HTTPException(
@@ -113,9 +125,15 @@ async def update_doctor(
 async def reset_doctor_password(
     doctor_id: int,
     db: AsyncSession = Depends(get_db),
-    _admin: Doctor = Depends(get_current_admin),
+    admin: Doctor = Depends(get_current_admin),
 ):
     doctor = await _get_doctor(db, doctor_id)
+    # Regular admin cannot reset passwords of other admin accounts
+    if admin.role != "super_admin" and doctor.role in ("admin", "super_admin") and doctor.id != admin.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can reset passwords of other admin accounts",
+        )
     generated_password = secrets.token_urlsafe(12)[:12]
     doctor.hashed_password = get_password_hash(generated_password)
     doctor.must_change_password = True

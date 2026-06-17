@@ -60,7 +60,7 @@ async def get_current_active_doctor(
 async def get_current_admin(
     doctor: Doctor = Depends(get_current_doctor),
 ) -> Doctor:
-    if doctor.role != "admin":
+    if doctor.role not in ("admin", "super_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required",
