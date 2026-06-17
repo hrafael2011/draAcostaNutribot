@@ -7,10 +7,12 @@ from app.api.deps import get_current_admin
 from app.core.database import get_db
 from app.core.security import get_password_hash
 from app.models import Doctor, utcnow
+import secrets
+
 from app.schemas import (
     AdminDoctorCreate,
+    AdminDoctorCreateResponse,
     AdminDoctorUpdate,
-    AdminPasswordReset,
     DoctorOut,
 )
 
@@ -28,7 +30,7 @@ async def list_doctors(
 
 @router.post(
     "/doctors",
-    response_model=DoctorOut,
+    response_model=AdminDoctorCreateResponse,
     status_code=status.HTTP_201_CREATED,
 )
 async def create_doctor(
@@ -36,11 +38,12 @@ async def create_doctor(
     db: AsyncSession = Depends(get_db),
     _admin: Doctor = Depends(get_current_admin),
 ):
+    generated_password = secrets.token_urlsafe(12)[:12]
     doctor = Doctor(
         full_name=body.full_name.strip(),
         email=body.email.lower().strip(),
         phone=body.phone,
-        hashed_password=get_password_hash(body.temporary_password),
+        hashed_password=get_password_hash(generated_password),
         role=body.role,
         must_change_password=True,
         is_active=True,
@@ -55,7 +58,17 @@ async def create_doctor(
             detail="Email already registered",
         )
     await db.refresh(doctor)
-    return doctor
+    return AdminDoctorCreateResponse(
+        id=doctor.id,
+        full_name=doctor.full_name,
+        email=doctor.email,
+        phone=doctor.phone,
+        role=doctor.role,
+        must_change_password=doctor.must_change_password,
+        is_active=doctor.is_active,
+        created_at=doctor.created_at,
+        generated_password=generated_password,
+    )
 
 
 @router.patch("/doctors/{doctor_id}", response_model=DoctorOut)
@@ -96,20 +109,20 @@ async def update_doctor(
     return doctor
 
 
-@router.post("/doctors/{doctor_id}/reset-password", response_model=DoctorOut)
+@router.post("/doctors/{doctor_id}/reset-password")
 async def reset_doctor_password(
     doctor_id: int,
-    body: AdminPasswordReset,
     db: AsyncSession = Depends(get_db),
     _admin: Doctor = Depends(get_current_admin),
 ):
     doctor = await _get_doctor(db, doctor_id)
-    doctor.hashed_password = get_password_hash(body.temporary_password)
+    generated_password = secrets.token_urlsafe(12)[:12]
+    doctor.hashed_password = get_password_hash(generated_password)
     doctor.must_change_password = True
     doctor.updated_at = utcnow()
     await db.commit()
     await db.refresh(doctor)
-    return doctor
+    return {"generated_password": generated_password}
 
 
 async def _get_doctor(db: AsyncSession, doctor_id: int) -> Doctor:
