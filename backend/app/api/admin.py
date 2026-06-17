@@ -185,16 +185,13 @@ async def list_audit_logs(
     admin: Doctor = Depends(get_current_admin),
 ):
     """Devuelve el historial de acciones de administración (solo gestión de usuarios)."""
-    admin_actions = [
-        "Creó el usuario", "Actualizó datos de", "Reseteó la contraseña de",
-        "Activó a", "Desactivó a",
-    ]
-    from sqlalchemy import or_
+    # Known technical actions to exclude (diet system, telegram, etc.)
+    excluded = {"telegram_unbind", "telegram_bind"}
     q = (
         select(AuditLog)
         .where(
             AuditLog.entity_type == "doctor",
-            or_(AuditLog.action.like(f"{a}%") for a in admin_actions)
+            ~AuditLog.action.in_(excluded)
         )
         .order_by(AuditLog.created_at.desc())
         .limit(100)
