@@ -27,6 +27,9 @@ frontend/src/tailwind-gen.css
 .DS_Store
 Thumbs.db
 
+# ── Docs / Comandos locales ────────────────────────────────────────
+docs/railway-comandos.md
+
 # ── Backups ─────────────────────────────────────────────────────────
 backups/
 
