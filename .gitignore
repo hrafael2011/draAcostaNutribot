@@ -1,7 +1,11 @@
+# ── Secretos ───────────────────────────────────────────────────────
 .env
 .env.*
 !.env.example
 !**/.env.example
+client_secret_*.json
+
+# ── Python ──────────────────────────────────────────────────────────
 **/__pycache__/
 *.py[cod]
 .pytest_cache/
@@ -12,15 +16,29 @@ dist/
 build/
 .venv/
 venv/
+
+# ── Node / Frontend ─────────────────────────────────────────────────
 node_modules/
 frontend/dist/
+frontend/src/tailwind-gen.css
 *.log
-.DS_Store
-backups/
-.codex
-backend/.tmp_pdf/
 
-# Local sample / personal exports (keep out of git)
+# ── OS / System ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Backups ─────────────────────────────────────────────────────────
+backups/
+
+# ── Temporary files ─────────────────────────────────────────────────
+.codex
+.vercel
+backend/.tmp_pdf/
+frontend/test-results/
+
+# ── Superpowers ─────────────────────────────────────────────────────
+.superpowers/
+
+# ── Samples / Local exports ─────────────────────────────────────────
 *.pdf
 backend/samples/sample_plan_official_preview.html
-.vercel
