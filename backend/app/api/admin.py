@@ -85,13 +85,19 @@ async def update_doctor(
     admin: Doctor = Depends(get_current_admin),
 ):
     doctor = await _get_doctor(db, doctor_id)
+    data = body.model_dump(exclude_unset=True)
+    # Regular admin cannot promote any user to admin
+    if admin.role != "super_admin" and data.get("role") == "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only super admins can create admin accounts",
+        )
     # Regular admin cannot modify other admin accounts
     if admin.role != "super_admin" and doctor.role in ("admin", "super_admin") and doctor.id != admin.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only super admins can modify other admin accounts",
         )
-    data = body.model_dump(exclude_unset=True)
     if doctor.id == admin.id and data.get("is_active") is False:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

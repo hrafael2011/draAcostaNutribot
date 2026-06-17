@@ -94,6 +94,11 @@ async def login(
         )
     # Portal validation
     portal = form_data.client_secret or "doctor"
+    if portal not in ("admin", "doctor"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid portal value",
+        )
     if portal == "admin" and doctor.role not in ("admin", "super_admin"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
