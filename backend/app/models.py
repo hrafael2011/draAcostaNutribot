@@ -38,6 +38,9 @@ class Doctor(Base):
         "PatientIntakeLink", back_populates="doctor", cascade="all, delete"
     )
     diets = relationship("Diet", back_populates="doctor", cascade="all, delete")
+    password_reset_tokens = relationship(
+        "PasswordResetToken", back_populates="doctor", cascade="all, delete"
+    )
 
 
 class Patient(Base):
@@ -216,4 +219,4 @@ class PasswordResetToken(Base):
     used = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=utcnow, nullable=False)
 
-    doctor = relationship("Doctor")
+    doctor = relationship("Doctor", back_populates="password_reset_tokens")
