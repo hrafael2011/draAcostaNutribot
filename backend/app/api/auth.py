@@ -8,8 +8,20 @@ from app.core.database import get_db
 from app.core.security import create_access_token, get_password_hash, verify_password
 from app.core.config import settings
 from app.api.deps import get_current_active_doctor
-from app.models import Doctor, utcnow
-from app.schemas import DoctorCreate, DoctorOut, PasswordChange, Token
+from app.models import Doctor, PasswordResetToken, utcnow
+from app.schemas import (
+    DoctorCreate,
+    DoctorOut,
+    ForgotPasswordRequest,
+    PasswordChange,
+    ResetPasswordRequest,
+    Token,
+    VerifyTokenResponse,
+)
+from app.services.auth_email_service import send_password_reset_email
+
+import secrets
+from datetime import timedelta
 
 router = APIRouter()
 
@@ -137,4 +149,94 @@ async def refresh():
 
 @router.post("/logout")
 async def logout():
+    return {"ok": True}
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    body: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    # Always respond same way regardless of whether email exists (prevents enumeration)
+    result = await db.execute(
+        select(Doctor).where(Doctor.email == body.email.lower().strip())
+    )
+    doctor = result.scalar_one_or_none()
+
+    if doctor is not None:
+        # Invalidate any existing unused tokens for this doctor
+        existing = await db.execute(
+            select(PasswordResetToken).where(
+                PasswordResetToken.doctor_id == doctor.id,
+                PasswordResetToken.used == False,
+                PasswordResetToken.expires_at > utcnow(),
+            )
+        )
+        for tok in existing.scalars():
+            tok.used = True
+
+        token = secrets.token_urlsafe(32)
+        reset_token = PasswordResetToken(
+            doctor_id=doctor.id,
+            token=token,
+            expires_at=utcnow() + timedelta(minutes=30),
+        )
+        db.add(reset_token)
+        await db.commit()
+
+        reset_link = f"{settings.APP_URL}/reset-password?token={token}"
+        send_password_reset_email(doctor.email, doctor.full_name, reset_link)
+
+    return {"ok": True, "message": "Si el correo existe, recibirás instrucciones"}
+
+
+@router.get("/verify-reset-token", response_model=VerifyTokenResponse)
+async def verify_reset_token(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token == token)
+    )
+    reset_token = result.scalar_one_or_none()
+
+    if reset_token is None or reset_token.used or reset_token.expires_at <= utcnow():
+        return VerifyTokenResponse(valid=False)
+
+    doctor = await db.get(Doctor, reset_token.doctor_id)
+    if doctor is None or not doctor.is_active:
+        return VerifyTokenResponse(valid=False)
+
+    return VerifyTokenResponse(valid=True, email=doctor.email)
+
+
+@router.post("/reset-password")
+async def reset_password(
+    body: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token == body.token)
+    )
+    reset_token = result.scalar_one_or_none()
+
+    if reset_token is None or reset_token.used or reset_token.expires_at <= utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token inválido o expirado",
+        )
+
+    doctor = await db.get(Doctor, reset_token.doctor_id)
+    if doctor is None or not doctor.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token inválido o expirado",
+        )
+
+    doctor.hashed_password = get_password_hash(body.new_password)
+    doctor.must_change_password = False
+    doctor.updated_at = utcnow()
+    reset_token.used = True
+    await db.commit()
+
     return {"ok": True}
