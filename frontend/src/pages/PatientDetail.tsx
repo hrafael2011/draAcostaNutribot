@@ -71,6 +71,12 @@ const FOODS_AVOIDED_OPTIONS = [
   "Frituras",
 ]
 
+const FOOD_PREFERENCES_OPTIONS = [
+  "Carnes rojas", "Pollo", "Pescado", "Mariscos", "Cerdo",
+  "Verduras", "Frutas", "Arroz", "Pasta", "Pan", "Legumbres",
+  "Huevos", "Lácteos", "Frutos secos", "Dulces",
+]
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 const INPUT_CLASSES =
@@ -386,6 +392,10 @@ export default function PatientDetail() {
   const [exerciseTypeOther, setExerciseTypeOther] = useState("")
   const [foodsAvoidedPills, setFoodsAvoidedPills] = useState<string[]>([])
   const [foodsAvoidedOther, setFoodsAvoidedOther] = useState("")
+  const [foodPrefsPills, setFoodPrefsPills] = useState<string[]>([])
+  const [foodPrefsOther, setFoodPrefsOther] = useState("")
+  const [dislikedPills, setDislikedPills] = useState<string[]>([])
+  const [dislikedOther, setDislikedOther] = useState("")
 
   // Inicializar pills desde perfil cargado
   useEffect(() => {
@@ -405,6 +415,12 @@ export default function PatientDetail() {
     const [fap, fao] = parseMultiValue(profile.foods_avoided, FOODS_AVOIDED_OPTIONS)
     setFoodsAvoidedPills(fap)
     setFoodsAvoidedOther(fao)
+    const [fpp, fpo] = parseMultiValue(profile.food_preferences, FOOD_PREFERENCES_OPTIONS)
+    setFoodPrefsPills(fpp)
+    setFoodPrefsOther(fpo)
+    const [dlp, dlo] = parseMultiValue(profile.disliked_foods, FOOD_PREFERENCES_OPTIONS)
+    setDislikedPills(dlp)
+    setDislikedOther(dlo)
   }, [profile])
 
   // ── Carga inicial de datos ─────────────────────────────────────────────
@@ -509,8 +525,8 @@ export default function PatientDetail() {
       foods_avoided: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),
       medical_history: (fd.get("medical_history") as string) || null,
       dietary_style: buildMultiValue(dietaryPills, dietaryOther),
-      food_preferences: (fd.get("food_preferences") as string) || null,
-      disliked_foods: (fd.get("disliked_foods") as string) || null,
+      food_preferences: buildMultiValue(foodPrefsPills, foodPrefsOther),
+      disliked_foods: buildMultiValue(dislikedPills, dislikedOther),
       water_intake_liters: num("water_intake_liters"),
       activity_level: (fd.get("activity_level") as string) || null,
       stress_level: num("stress_level"),
@@ -1185,26 +1201,28 @@ export default function PatientDetail() {
                 {/* Preferencias alimentarias */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Preferencias alimentarias
+                    Alimentos que le gustan
                   </label>
-                  <textarea
-                    name="food_preferences"
-                    rows={2}
-                    defaultValue={profile?.food_preferences ?? ""}
-                    className={INPUT_CLASSES}
+                  <PillSelect
+                    options={FOOD_PREFERENCES_OPTIONS}
+                    selected={foodPrefsPills}
+                    otherText={foodPrefsOther}
+                    onChange={setFoodPrefsPills}
+                    onOtherChange={setFoodPrefsOther}
                   />
                 </div>
 
                 {/* Alimentos no deseados */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Alimentos no deseados
+                    Alimentos que NO le gustan
                   </label>
-                  <textarea
-                    name="disliked_foods"
-                    rows={2}
-                    defaultValue={profile?.disliked_foods ?? ""}
-                    className={INPUT_CLASSES}
+                  <PillSelect
+                    options={FOOD_PREFERENCES_OPTIONS}
+                    selected={dislikedPills}
+                    otherText={dislikedOther}
+                    onChange={setDislikedPills}
+                    onOtherChange={setDislikedOther}
                   />
                 </div>
 
@@ -1216,7 +1234,6 @@ export default function PatientDetail() {
                   <input
                     name="water_intake_liters"
                     type="number"
-                    step="0.1"
                     min="0"
                     max="10"
                     defaultValue={profile?.water_intake_liters ?? ""}
@@ -1295,7 +1312,6 @@ export default function PatientDetail() {
                   <input
                     name="sleep_hours"
                     type="number"
-                    step="0.5"
                     min="3"
                     max="12"
                     defaultValue={profile?.sleep_hours ?? ""}
