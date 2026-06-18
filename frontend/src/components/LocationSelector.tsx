@@ -16,8 +16,8 @@ export default function LocationSelector({
   onCityChange,
   disabled = false,
 }: LocationSelectorProps) {
-  const [searchCountry, setSearchCountry] = useState("")
-  const [searchCity, setSearchCity] = useState("")
+  const [searchCountry, setSearchCountry] = useState(country)
+  const [searchCity, setSearchCity] = useState(city)
   const [showCountryDropdown, setShowCountryDropdown] = useState(false)
   const [showCityDropdown, setShowCityDropdown] = useState(false)
 
