@@ -138,7 +138,7 @@ async def get_diet(
 ):
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
     return diet
 
 
@@ -150,7 +150,7 @@ async def list_versions(
 ):
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
     result = await db.execute(
         select(DietVersion)
         .where(DietVersion.diet_id == diet_id)
@@ -281,7 +281,7 @@ async def export_diet(
 ):
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
     if export_format == "json":
         body = build_diet_export_json_bytes(diet)
         return Response(
@@ -312,7 +312,7 @@ async def get_diet_pdf(
 ):
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
     patient = await db.get(Patient, diet.patient_id)
     profile = None
     metrics = None
@@ -355,7 +355,7 @@ async def email_diet_pdf(
     if diet is None or diet.doctor_id != doctor.id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Diet not found",
+            detail="Dieta no encontrada",
         )
 
     patient = await db.get(Patient, diet.patient_id)
@@ -432,7 +432,7 @@ async def soft_delete_diet(
 ):
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
     diet.deleted_at = utcnow()
     await db.commit()
     return {"ok": True}
@@ -446,7 +446,7 @@ async def restore_diet(
 ):
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
     diet.deleted_at = None
     await db.commit()
     return {"ok": True}
@@ -460,7 +460,7 @@ async def hard_delete_diet(
 ):
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Diet not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
     await db.delete(diet)
     await db.commit()
     return {"ok": True}

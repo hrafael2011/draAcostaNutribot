@@ -121,7 +121,7 @@ def _validate_physiology(
         return NutritionAlert(
             code="invalid_age",
             severity=NutritionAlertSeverity.BLOCK,
-            message_es="Edad fuera del rango soportado (14–100 años) para este motor.",
+            message_es="La edad debe estar entre 14 y 100 años.",
             blocks_generation=True,
         )
     return None
@@ -237,8 +237,7 @@ def compute_nutrition(nutrition_input: NutritionInput) -> NutritionResult:
             NutritionAlert(
                 code="condition_unspecified",
                 severity=NutritionAlertSeverity.BLOCK,
-                message_es="Hay condiciones de salud no clasificadas en las reglas del sistema; "
-                "requiere revisión profesional antes de generar automáticamente.",
+                message_es="El paciente tiene condiciones de salud que requieren revisión manual antes de generar la dieta.",
                 blocks_generation=True,
             )
         )

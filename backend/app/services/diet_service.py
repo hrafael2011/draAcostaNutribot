@@ -69,7 +69,7 @@ async def load_patient_bundle(
 ) -> Tuple[Patient, Optional[PatientProfile], Optional[PatientMetrics]]:
     patient = await db.get(Patient, patient_id)
     if patient is None or patient.doctor_id != doctor_id:
-        raise DietGenerationError("not_found", "Patient not found")
+        raise DietGenerationError("not_found", "Paciente no encontrado")
     pr = await db.execute(
         select(PatientProfile).where(PatientProfile.patient_id == patient_id)
     )
@@ -224,13 +224,13 @@ async def create_new_diet(
     if blockers:
         raise DietGenerationError(
             "incomplete_profile",
-            "Patient data incomplete for diet generation",
+            "Faltan datos del paciente para crear la dieta",
             blockers,
         )
     if profile is None or metrics is None:
         raise DietGenerationError(
             "incomplete_profile",
-            "Patient data incomplete for diet generation",
+            "Faltan datos del paciente para crear la dieta",
             ["Missing profile or metrics"],
         )
     try:
@@ -253,7 +253,7 @@ async def create_new_diet(
     except Exception as e:
         raise DietGenerationError(
             "openai_error",
-            f"Model error: {e}",
+            "Error al generar la dieta. Revise los datos e intente de nuevo.",
         ) from e
 
     title = (plan.get("title") or "Plan nutricional")[:160]
@@ -451,13 +451,13 @@ async def regenerate_diet(
     if blockers:
         raise DietGenerationError(
             "incomplete_profile",
-            "Patient data incomplete for diet generation",
+            "Faltan datos del paciente para crear la dieta",
             blockers,
         )
     if profile is None or metrics is None:
         raise DietGenerationError(
             "incomplete_profile",
-            "Patient data incomplete for diet generation",
+            "Faltan datos del paciente para crear la dieta",
             ["Missing profile or metrics"],
         )
     try:
@@ -478,7 +478,10 @@ async def regenerate_diet(
     except RuntimeError as e:
         raise DietGenerationError("openai_config", str(e)) from e
     except Exception as e:
-        raise DietGenerationError("openai_error", f"Model error: {e}") from e
+        raise DietGenerationError(
+            "openai_error",
+            "Error al generar la dieta. Revise los datos e intente de nuevo.",
+        ) from e
 
     title = (plan.get("title") or diet.title or "Plan nutricional")[:160]
     summary = plan.get("summary") or ""

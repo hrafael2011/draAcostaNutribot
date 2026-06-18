@@ -42,7 +42,7 @@ def _age_years(birth: date) -> int:
 
 def _float_metric(v: Optional[Decimal | float | int]) -> float:
     if v is None:
-        raise NutritionInputBuildError("missing_metric", "Falta métrica numérica.")
+        raise NutritionInputBuildError("missing_metric", "Falta un valor numérico requerido para el cálculo.")
     return float(v)
 
 
@@ -54,7 +54,7 @@ def _normalize_sex(raw: Optional[str]) -> SexForBmr:
         return SexForBmr.FEMALE
     raise NutritionInputBuildError(
         "unsupported_sex",
-        "Sexo no reconocido para el cálculo nutricional (use male/female o equivalente).",
+        "El sexo ingresado no es válido. Use Masculino o Femenino.",
     )
 
 
