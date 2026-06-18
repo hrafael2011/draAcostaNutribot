@@ -14,6 +14,8 @@ export default function DietDetail() {
   const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [patientEmail, setPatientEmail] = useState<string | null>(null)
+  const [emailLoading, setEmailLoading] = useState(false)
   const { editMeals } = useDietGeneration()
   const { addToast } = useToast()
 
@@ -22,6 +24,15 @@ export default function DietDetail() {
     setError(null)
     const d = await getDiet(id)
     setDiet(d)
+    if (d.patient_id) {
+      try {
+        const { getPatient } = await import("../services/api")
+        const p = await getPatient(d.patient_id)
+        setPatientEmail(p.email || null)
+      } catch {
+        setPatientEmail(null)
+      }
+    }
   }, [id])
 
   useEffect(() => {
@@ -74,6 +85,37 @@ export default function DietDetail() {
       addToast(err instanceof Error ? err.message : "Error al compartir PDF", "error")
     } finally {
       setPdfLoading(false)
+    }
+  }
+
+  const handleSendEmail = async () => {
+    if (!diet) return
+    if (!patientEmail) {
+      addToast(
+        "El paciente no tiene correo registrado. Use la opción de Descargar o Compartir.",
+        "info",
+      )
+      return
+    }
+    setEmailLoading(true)
+    try {
+      const { sendDietByEmail } = await import("../services/api")
+      const result = await sendDietByEmail(diet.id)
+      addToast(`Dieta enviada a ${result.sent_to}`, "success")
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === "PATIENT_NO_EMAIL") {
+        addToast(
+          "El paciente no tiene correo registrado. Use la opción de Descargar o Compartir.",
+          "info",
+        )
+      } else {
+        addToast(
+          err instanceof Error ? err.message : "Error al enviar por correo",
+          "error",
+        )
+      }
+    } finally {
+      setEmailLoading(false)
     }
   }
 
@@ -173,16 +215,19 @@ export default function DietDetail() {
         }}
         onDownloadPdf={handleDownloadPdf}
         onSharePdf={handleSharePdf}
+        onSendEmail={handleSendEmail}
+        emailLoading={emailLoading}
+        patientEmail={patientEmail}
       />
       <GenerationOverlay
-        open={pdfLoading}
+        open={pdfLoading || emailLoading}
         patientName=""
-        label="Descargando PDF..."
-        doneLabel="¡PDF descargado!"
+        label={emailLoading ? "Enviando por correo..." : "Descargando PDF..."}
+        doneLabel={emailLoading ? "¡Correo enviado!" : "¡PDF descargado!"}
         steps={[
           { pct: 30, msg: "Preparando documento..." },
           { pct: 60, msg: "Renderizando plan nutricional..." },
-          { pct: 90, msg: "Finalizando..." },
+          { pct: 90, msg: emailLoading ? "Enviando correo..." : "Finalizando..." },
         ]}
         onComplete={() => {}}
       />
