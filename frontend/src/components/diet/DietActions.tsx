@@ -36,7 +36,7 @@ export default function DietActions({
 }: Props) {
   const [showQuickAdjust, setShowQuickAdjust] = useState(false)
   const isMobile = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)
-    || (navigator.maxTouchPoints > 0 && /MacIntel/.test(navigator.platform))
+    || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0)
 
   const handleSendEmail = () => {
     if (!patientEmail) {
