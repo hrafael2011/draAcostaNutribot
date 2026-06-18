@@ -187,6 +187,26 @@ function checkDietReadiness(
   return missing
 }
 
+function checkMissingDemographics(patientData: Partial<Patient>): string[] {
+  const missing: string[] = []
+  if (!patientData.birth_date) missing.push("fecha de nacimiento")
+  if (!patientData.sex) missing.push("sexo")
+  if (!patientData.country || !patientData.city) missing.push("país o ciudad")
+  return missing
+}
+
+function checkMissingProfile(profileData: Partial<PatientProfile> | null): string[] {
+  const missing: string[] = []
+  if (!profileData) {
+    missing.push("perfil clínico completo")
+  } else {
+    if (!profileData.objective) missing.push("objetivo")
+    if (!profileData.food_allergies) missing.push("alergias alimentarias")
+    if (!profileData.foods_avoided) missing.push("alimentos a evitar")
+  }
+  return missing
+}
+
 // ── WeightSparkline ─────────────────────────────────────────────────────────
 
 function WeightSparkline({ metrics }: { metrics: PatientMetric[] }) {
@@ -519,10 +539,10 @@ export default function PatientDetail() {
       }
       const p = await patchPatient(patientId, body)
       setPatient(p)
-      const missing = checkDietReadiness(p, profile, summary?.latest_metrics)
+      const missing = checkMissingDemographics(p)
       if (missing.length > 0) {
         addToast(
-          `Para crear una dieta, aún falta: ${missing.join(", ")}.`,
+          `Para crear una dieta, complete: ${missing.join(", ")}.`,
           "info",
         )
       }
@@ -595,7 +615,7 @@ export default function PatientDetail() {
         try {
           const pr = await patchProfile(patientId, body)
           setProfile(pr)
-          const missing = patient ? checkDietReadiness(patient, pr, summary?.latest_metrics) : ["datos del paciente"]
+          const missing = checkMissingProfile(pr)
           if (missing.length > 0) {
             addToast(
               `Para crear una dieta, aún falta: ${missing.join(", ")}.`,
