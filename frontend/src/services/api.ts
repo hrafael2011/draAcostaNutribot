@@ -455,6 +455,20 @@ export async function downloadDietPdf(id: number) {
   URL.revokeObjectURL(url)
 }
 
+export async function sendDietByEmail(dietId: number): Promise<{ ok: boolean; sent_to: string }> {
+  const res = await authFetch(`/diets/${dietId}/email`, {
+    method: "POST",
+  })
+  if (!res.ok) {
+    const detail = await readApiError(res)
+    if (detail === "PATIENT_NO_EMAIL") {
+      throw new Error("PATIENT_NO_EMAIL")
+    }
+    throw new Error(detail || "Error al enviar por correo")
+  }
+  return res.json() as Promise<{ ok: boolean; sent_to: string }>
+}
+
 export async function downloadDietExport(id: number, format: "txt" | "json") {
   const token = getStoredToken()
   const res = await fetch(
