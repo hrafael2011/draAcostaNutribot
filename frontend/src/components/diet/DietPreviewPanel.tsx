@@ -24,9 +24,12 @@ type Props = {
   onDiscard?: () => void
   onDownloadPdf?: () => void
   onSharePdf?: () => void
+  onSendEmail?: () => void
+  emailLoading?: boolean
+  patientEmail?: string | null
 }
 
-export default function DietPreviewPanel({ diet, editable, onMealSave, onToggleEdit, onApprove, onDiscard, onDownloadPdf, onSharePdf }: Props) {
+export default function DietPreviewPanel({ diet, editable, onMealSave, onToggleEdit, onApprove, onDiscard, onDownloadPdf, onSharePdf, onSendEmail, emailLoading, patientEmail }: Props) {
   const plan = diet.structured_plan_json
   const days = Array.isArray(plan.days) ? (plan.days as Record<string, unknown>[]) : []
   const mealSlots = Array.isArray(plan.meal_slots) ? (plan.meal_slots as string[]) : []
@@ -91,6 +94,9 @@ export default function DietPreviewPanel({ diet, editable, onMealSave, onToggleE
           }
         }}
         onSharePdf={onSharePdf}
+        onSendEmail={onSendEmail}
+        emailLoading={emailLoading}
+        patientEmail={patientEmail}
         onToggleEdit={onToggleEdit}
         editing={editable}
         loading={loading}
