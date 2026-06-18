@@ -67,7 +67,6 @@ def send_email_with_attachment(
     attachment_mimetype: str = "application/pdf",
 ) -> bool:
     """Send email with a file attachment via Gmail API."""
-    import mimetypes
     from email.mime.application import MIMEApplication
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
@@ -84,7 +83,8 @@ def send_email_with_attachment(
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         # Attach file
-        part = MIMEApplication(attachment_bytes, _subtype="pdf")
+        _subtype = attachment_mimetype.split("/")[1] if "/" in attachment_mimetype else "pdf"
+        part = MIMEApplication(attachment_bytes, _subtype=_subtype)
         part.add_header(
             "Content-Disposition",
             "attachment",
