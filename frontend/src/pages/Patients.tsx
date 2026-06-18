@@ -180,7 +180,7 @@ export default function Patients() {
       {/* Patient list */}
       {data && data.items.length > 0 && (
         <>
-          <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100 overflow-hidden">
+          <div className="bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
             {data.items.map((p) => (
               <PatientRow
                 key={p.id}

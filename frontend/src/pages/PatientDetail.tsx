@@ -976,6 +976,7 @@ export default function PatientDetail() {
               type="button"
               onClick={() => {
                 setDataFormKey((k) => k + 1)
+                setEditBirthDate(patient.birth_date?.slice(0, 10) ?? "")
                 setEditCountry(patient.country ?? "")
                 setEditCity(patient.city ?? "")
                 setEditingData(true)
@@ -1124,6 +1125,7 @@ export default function PatientDetail() {
               type="button"
               onClick={() => {
                 setProfileFormKey((k) => k + 1)
+                setEditMedications(profile?.medications ?? "")
                 setEditingProfile(true)
               }}
               className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"

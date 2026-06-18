@@ -4,7 +4,8 @@ import { X, CaretDown, CaretUp, Spinner } from "@phosphor-icons/react";
 import { createPatient, patchProfile, addMetric } from "../../services/api";
 import { useToast } from "../../context/ToastContext";
 import type { Patient } from "../../types";
-import DatePicker from "../ui/DatePicker";
+import DatePicker from "../ui/DatePicker"
+import LocationSelector from "../LocationSelector";
 import NoAplicaField from "../ui/NoAplicaField";
 import WeightInput from "../ui/WeightInput";
 import HeightInput from "../ui/HeightInput";
@@ -302,34 +303,12 @@ export default function PatientDrawer({ open, onClose, onCreated }: PatientDrawe
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label htmlFor="drawer-country" className={LABEL_CLASS}>
-                        País
-                      </label>
-                      <input
-                        id="drawer-country"
-                        type="text"
-                        value={form.country}
-                        onChange={setField("country")}
-                        placeholder="Ej. Argentina"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                    <div>
-                      <label htmlFor="drawer-city" className={LABEL_CLASS}>
-                        Ciudad
-                      </label>
-                      <input
-                        id="drawer-city"
-                        type="text"
-                        value={form.city}
-                        onChange={setField("city")}
-                        placeholder="Ej. Buenos Aires"
-                        className={INPUT_CLASS}
-                      />
-                    </div>
-                  </div>
+                  <LocationSelector
+                    country={form.country}
+                    city={form.city}
+                    onCountryChange={(c) => { setForm((prev) => ({ ...prev, country: c, city: "" })) }}
+                    onCityChange={(c) => setForm((prev) => ({ ...prev, city: c }))}
+                  />
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
