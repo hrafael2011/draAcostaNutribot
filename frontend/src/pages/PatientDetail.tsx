@@ -1481,7 +1481,7 @@ export default function PatientDetail() {
             <div className="p-4 bg-slate-50 rounded-xl">
               <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Historial Clínico</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-                {renderProfileField("Objetivo", profile?.objective)}
+                {renderProfileField("Objetivo", OBJECTIVE_OPTIONS.find(o => o.value === profile?.objective)?.label || profile?.objective)}
                 <div>
                   <span className="text-xs text-slate-500">Enfermedades</span>
                   {renderMultiTag(profile?.diseases)}
