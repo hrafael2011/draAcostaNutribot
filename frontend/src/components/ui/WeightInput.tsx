@@ -26,7 +26,7 @@ export default function WeightInput({
   const displayValue = (() => {
     if (!valueKg || isNaN(kg)) return "";
     if (unit === "kg") return valueKg;
-    return (kg / WEIGHT_LB_TO_KG).toFixed(1);
+    return String(kg / WEIGHT_LB_TO_KG);
   })();
 
   function handleValueChange(e: ChangeEvent<HTMLInputElement>) {
@@ -38,7 +38,7 @@ export default function WeightInput({
     const num = parseFloat(raw);
     if (isNaN(num)) return;
     const kgValue = unit === "kg" ? num : num * WEIGHT_LB_TO_KG;
-    onChangeKg(kgValue.toFixed(2));
+    onChangeKg(String(kgValue));
   }
 
   function handleUnitChange(e: ChangeEvent<HTMLSelectElement>) {
@@ -49,7 +49,6 @@ export default function WeightInput({
     <div className="flex gap-2 flex-wrap">
       <input
         type="number"
-        step="0.1"
         min="0"
         value={displayValue}
         onChange={handleValueChange}

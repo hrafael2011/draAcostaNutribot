@@ -40,7 +40,7 @@ export default function HeightInput({
     }
     const num = parseFloat(raw);
     if (isNaN(num)) return;
-    onChangeCm(num.toFixed(1));
+    onChangeCm(String(num));
   }
 
   function handleFtInChange(ftStr: string, inStr: string) {
@@ -71,7 +71,6 @@ export default function HeightInput({
       {unit === "cm" ? (
         <input
           type="number"
-          step="0.1"
           min="0"
           value={displayCm}
           onChange={handleCmChange}
