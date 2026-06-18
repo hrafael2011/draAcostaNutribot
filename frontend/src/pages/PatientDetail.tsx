@@ -19,6 +19,7 @@ import HeightInput from "../components/ui/HeightInput"
 import { OBJECTIVE_OPTIONS } from "../constants/objectives"
 import ConfirmModal from "../components/ui/ConfirmModal"
 import type { ChangeItem } from "../components/ui/ConfirmModal"
+import LocationSelector from "../components/LocationSelector"
 
 // ── Opciones predefinidas ───────────────────────────────────────────────────
 
@@ -354,6 +355,8 @@ export default function PatientDetail() {
   // Inline edit booleans
   const [editingData, setEditingData] = useState(false)
   const [editingProfile, setEditingProfile] = useState(false)
+  const [editCountry, setEditCountry] = useState(patient?.country ?? "")
+  const [editCity, setEditCity] = useState(patient?.city ?? "")
   const [showMetricForm, setShowMetricForm] = useState(false)
 
   // Form keys to force re-mount with fresh defaults
@@ -472,8 +475,8 @@ export default function PatientDetail() {
         sex: (fd.get("sex") as string) || null,
         email: (fd.get("email") as string) || null,
         whatsapp: (fd.get("whatsapp") as string) || null,
-        country: (fd.get("country") as string) || null,
-        city: (fd.get("city") as string) || null,
+        country: editCountry || null,
+        city: editCity || null,
         is_active: fd.get("is_active") === "on",
         is_archived: fd.get("is_archived") === "on",
       }
@@ -749,6 +752,8 @@ export default function PatientDetail() {
                 setProfileFormKey((k) => k + 1)
                 setEditBirthDate(patient.birth_date?.slice(0, 10) ?? "")
                 setEditMedications(profile?.medications ?? "")
+                setEditCountry(patient.country ?? "")
+                setEditCity(patient.city ?? "")
                 setEditingData(true)
                 setEditingProfile(true)
               }}
@@ -986,27 +991,12 @@ export default function PatientDetail() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                País
-              </label>
-              <input
-                name="country"
-                defaultValue={patient.country ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">
-                Ciudad
-              </label>
-              <input
-                name="city"
-                defaultValue={patient.city ?? ""}
-                className={INPUT_CLASSES}
-              />
-            </div>
+            <LocationSelector
+              country={editCountry}
+              city={editCity}
+              onCountryChange={(c) => { setEditCountry(c); setEditCity("") }}
+              onCityChange={setEditCity}
+            />
 
             <div className="flex flex-wrap gap-4">
               <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
