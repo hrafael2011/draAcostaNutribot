@@ -166,6 +166,27 @@ function formatDate(dateStr?: string | null): string {
   })
 }
 
+function checkDietReadiness(
+  patientData: Partial<Patient>,
+  profileData: Partial<PatientProfile> | null,
+  latestMetric: PatientMetric | null | undefined,
+): string[] {
+  const missing: string[] = []
+  if (!patientData.birth_date) missing.push("fecha de nacimiento")
+  if (!patientData.sex) missing.push("sexo")
+  if (!patientData.country || !patientData.city) missing.push("país o ciudad")
+  if (!profileData) {
+    missing.push("perfil clínico")
+  } else {
+    if (!profileData.objective) missing.push("objetivo")
+    if (!profileData.food_allergies) missing.push("alergias alimentarias")
+    if (!profileData.foods_avoided) missing.push("alimentos a evitar")
+  }
+  if (!latestMetric || latestMetric.weight_kg == null) missing.push("peso")
+  if (!latestMetric || latestMetric.height_cm == null) missing.push("altura")
+  return missing
+}
+
 // ── WeightSparkline ─────────────────────────────────────────────────────────
 
 function WeightSparkline({ metrics }: { metrics: PatientMetric[] }) {
@@ -498,6 +519,13 @@ export default function PatientDetail() {
       }
       const p = await patchPatient(patientId, body)
       setPatient(p)
+      const missing = checkDietReadiness(p, profile, summary?.latest_metrics)
+      if (missing.length > 0) {
+        addToast(
+          `Para crear una dieta, aún falta: ${missing.join(", ")}.`,
+          "info",
+        )
+      }
       setEditingData(false)
       addToast("Datos guardados", "success")
     } catch (err) {
@@ -567,6 +595,13 @@ export default function PatientDetail() {
         try {
           const pr = await patchProfile(patientId, body)
           setProfile(pr)
+          const missing = checkDietReadiness(patient, pr, summary?.latest_metrics)
+          if (missing.length > 0) {
+            addToast(
+              `Para crear una dieta, aún falta: ${missing.join(", ")}.`,
+              "info",
+            )
+          }
           setEditingProfile(false)
           addToast("Perfil guardado", "success")
         } catch (err) {
