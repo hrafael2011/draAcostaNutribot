@@ -65,7 +65,7 @@ export default function DietDetail() {
     try {
       const blob = await getDietPdfBlob(diet.id)
       const file = new File([blob], `dieta-${diet.id}.pdf`, { type: "application/pdf" })
-      if (navigator.share && navigator.canShare({ files: [file] })) {
+      if (navigator.share && typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
           title: `Dieta - ${diet.title || "Plan Nutricional"}`,
