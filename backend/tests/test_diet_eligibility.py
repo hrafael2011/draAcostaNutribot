@@ -53,5 +53,5 @@ def test_blockers_when_missing_metrics():
         foods_avoided="none",
     )
     reasons = diet_generation_blockers(p, pr, None)
-    assert any("weight" in r.lower() for r in reasons)
-    assert any("height" in r.lower() for r in reasons)
+    assert any("peso" in r.lower() for r in reasons)
+    assert any("altura" in r.lower() for r in reasons)

@@ -169,7 +169,7 @@ function formatDate(dateStr?: string | null): string {
 function checkDietReadiness(
   patientData: Partial<Patient>,
   profileData: Partial<PatientProfile> | null,
-  latestMetric: PatientMetric | null | undefined,
+  latestMetric: { weight_kg?: number | null; height_cm?: number | null } | null | undefined,
 ): string[] {
   const missing: string[] = []
   if (!patientData.birth_date) missing.push("fecha de nacimiento")
@@ -595,7 +595,7 @@ export default function PatientDetail() {
         try {
           const pr = await patchProfile(patientId, body)
           setProfile(pr)
-          const missing = checkDietReadiness(patient, pr, summary?.latest_metrics)
+          const missing = patient ? checkDietReadiness(patient, pr, summary?.latest_metrics) : ["datos del paciente"]
           if (missing.length > 0) {
             addToast(
               `Para crear una dieta, aún falta: ${missing.join(", ")}.`,
