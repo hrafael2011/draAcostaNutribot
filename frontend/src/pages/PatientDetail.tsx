@@ -905,6 +905,8 @@ export default function PatientDetail() {
               type="button"
               onClick={() => {
                 setDataFormKey((k) => k + 1)
+                setEditCountry(patient.country ?? "")
+                setEditCity(patient.city ?? "")
                 setEditingData(true)
               }}
               className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
