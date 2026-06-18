@@ -44,7 +44,7 @@ if [ ! -d ".venv" ]; then
   fail "No existe backend/.venv — ejecuta: cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt"
 fi
 source .venv/bin/activate
-uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" --reload &
+uvicorn app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" &
 BACKEND_PID=$!
 cd "$ROOT"
 # Esperar a que responda health check
