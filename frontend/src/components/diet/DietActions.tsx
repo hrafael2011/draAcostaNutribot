@@ -35,8 +35,6 @@ export default function DietActions({
   patientEmail,
 }: Props) {
   const [showQuickAdjust, setShowQuickAdjust] = useState(false)
-  const isMobile = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)
-    || (typeof navigator !== "undefined" && navigator.maxTouchPoints > 0)
 
   const handleSendEmail = () => {
     if (!patientEmail) {
@@ -90,24 +88,21 @@ export default function DietActions({
             ⚠️ El paciente no tiene correo registrado
           </p>
         )}
-        {isMobile ? (
-          onSharePdf && (
-            <Button
-              variant="secondary"
-              onClick={onSharePdf}
-              className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50"
-            >
-              <span className="flex items-center justify-center gap-1.5">
-                <Share size={14} />
-                Compartir
-              </span>
-            </Button>
-          )
-        ) : (
-          <Button onClick={onDownloadPdf} className="w-full">
-            📄 Descargar PDF
+        {onSharePdf && (
+          <Button
+            variant="secondary"
+            onClick={onSharePdf}
+            className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50 md:hidden"
+          >
+            <span className="flex items-center justify-center gap-1.5">
+              <Share size={14} />
+              Compartir
+            </span>
           </Button>
         )}
+        <Button onClick={onDownloadPdf} className="w-full hidden md:block">
+          📄 Descargar PDF
+        </Button>
         <Button variant="ghost" onClick={onToggleEdit} className="w-full text-sm">
           <span className="flex items-center justify-center gap-1.5">
             <PencilSimple size={14} />
