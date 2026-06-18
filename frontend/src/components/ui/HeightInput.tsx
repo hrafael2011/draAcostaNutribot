@@ -51,7 +51,7 @@ export default function HeightInput({
       return;
     }
     const cmValue = (ft * 12 + inch) * IN_TO_CM;
-    onChangeCm(cmValue.toFixed(1));
+    onChangeCm(String(cmValue));
   }
 
   function handleUnitChange(e: ChangeEvent<HTMLSelectElement>) {
