@@ -389,6 +389,12 @@ export default function PatientDetail() {
   // Metric form
   const [mWeight, setMWeight] = useState("")
   const [mHeight, setMHeight] = useState("")
+  const [mNeck, setMNeck] = useState("")
+  const [mChest, setMChest] = useState("")
+  const [mWaist, setMWaist] = useState("")
+  const [mHip, setMHip] = useState("")
+  const [mLeg, setMLeg] = useState("")
+  const [mCalf, setMCalf] = useState("")
   const [mNotes, setMNotes] = useState("")
 
   // Edit form controlled states
@@ -636,11 +642,23 @@ export default function PatientDetail() {
       await addMetric(patientId, {
         weight_kg: mWeight ? Number(mWeight) : null,
         height_cm: mHeight ? Number(mHeight) : null,
+        neck_cm: mNeck ? Number(mNeck) : null,
+        chest_cm: mChest ? Number(mChest) : null,
+        waist_cm: mWaist ? Number(mWaist) : null,
+        hip_cm: mHip ? Number(mHip) : null,
+        leg_cm: mLeg ? Number(mLeg) : null,
+        calf_cm: mCalf ? Number(mCalf) : null,
         notes: mNotes || null,
         source: "admin",
       })
       setMWeight("")
       setMHeight("")
+      setMNeck("")
+      setMChest("")
+      setMWaist("")
+      setMHip("")
+      setMLeg("")
+      setMCalf("")
       setMNotes("")
       setShowMetricForm(false)
       await refreshMetrics()
@@ -1578,6 +1596,32 @@ export default function PatientDetail() {
                 onChangeCm={setMHeight}
                 placeholder="ej. 162"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Cuello (cm)</label>
+                <input type="number" min="0" value={mNeck} onChange={(e) => setMNeck(e.target.value)} className={INPUT_CLASSES} placeholder="ej. 36" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Pecho (cm)</label>
+                <input type="number" min="0" value={mChest} onChange={(e) => setMChest(e.target.value)} className={INPUT_CLASSES} placeholder="ej. 95" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Cintura (cm)</label>
+                <input type="number" min="0" value={mWaist} onChange={(e) => setMWaist(e.target.value)} className={INPUT_CLASSES} placeholder="ej. 80" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Cadera (cm)</label>
+                <input type="number" min="0" value={mHip} onChange={(e) => setMHip(e.target.value)} className={INPUT_CLASSES} placeholder="ej. 100" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Pierna (cm)</label>
+                <input type="number" min="0" value={mLeg} onChange={(e) => setMLeg(e.target.value)} className={INPUT_CLASSES} placeholder="ej. 55" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Pantorrilla (cm)</label>
+                <input type="number" min="0" value={mCalf} onChange={(e) => setMCalf(e.target.value)} className={INPUT_CLASSES} placeholder="ej. 35" />
+              </div>
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
