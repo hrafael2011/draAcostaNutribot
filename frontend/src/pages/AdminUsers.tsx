@@ -229,7 +229,9 @@ export default function AdminUsers() {
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg"
             onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-gray-800">Crear Usuario</h2>
+              <h2 className="text-lg font-bold text-gray-800">
+                {isSuperAdmin ? "Crear Usuario" : "Crear Doctor"}
+              </h2>
               <button onClick={() => setShowCreate(false)} className="text-gray-400 hover:text-gray-600">
                 <X size={20} />
               </button>
@@ -247,15 +249,25 @@ export default function AdminUsers() {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
                     focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500" />
               </div>
-              <div className="mb-3">
-                <label className="mb-1 block text-sm font-medium text-gray-700">Rol</label>
-                <select value={createRole} onChange={(e) => setCreateRole(e.target.value as Role)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
-                    focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500">
-                  <option value="doctor">Doctor</option>
-                  {isSuperAdmin && <option value="admin">Admin</option>}
-                </select>
-              </div>
+              {isSuperAdmin ? (
+                <div className="mb-3">
+                  <label className="mb-1 block text-sm font-medium text-gray-700">Rol</label>
+                  <select value={createRole} onChange={(e) => setCreateRole(e.target.value as Role)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm
+                      focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                    <option value="doctor">Doctor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="mb-3 rounded-lg bg-emerald-50 border border-emerald-200 px-4 py-3 flex items-center gap-3">
+                  <span className="text-lg">👨‍⚕️</span>
+                  <div>
+                    <p className="text-sm font-medium text-emerald-800">Rol: Doctor</p>
+                    <p className="text-xs text-emerald-600">Los administradores crean doctores</p>
+                  </div>
+                </div>
+              )}
               <div className="mb-4 rounded-lg bg-amber-50 p-3 border border-amber-200">
                 <div className="text-xs text-gray-500">
                   La contraseña se generará automáticamente y se mostrará al crear el usuario.
@@ -266,7 +278,7 @@ export default function AdminUsers() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={creating}>
-                  {creating ? "Creando..." : "Crear Usuario"}
+                  {creating ? "Creando..." : isSuperAdmin ? "Crear Usuario" : "Crear Doctor"}
                 </Button>
               </div>
             </form>
