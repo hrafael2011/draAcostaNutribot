@@ -22,6 +22,7 @@ export default function DietDetail() {
   const refresh = useCallback(async () => {
     if (!Number.isFinite(id)) return
     setError(null)
+    setPatientEmail(null)
     const d = await getDiet(id)
     setDiet(d)
     if (d.patient_id) {
@@ -224,11 +225,17 @@ export default function DietDetail() {
         patientName=""
         label={emailLoading ? "Enviando por correo..." : "Descargando PDF..."}
         doneLabel={emailLoading ? "¡Correo enviado!" : "¡PDF descargado!"}
-        steps={[
-          { pct: 30, msg: "Preparando documento..." },
-          { pct: 60, msg: "Renderizando plan nutricional..." },
-          { pct: 90, msg: emailLoading ? "Enviando correo..." : "Finalizando..." },
-        ]}
+        steps={emailLoading
+          ? [
+              { pct: 50, msg: "Enviando correo electrónico..." },
+              { pct: 90, msg: "Confirmando entrega..." },
+            ]
+          : [
+              { pct: 30, msg: "Preparando documento..." },
+              { pct: 60, msg: "Renderizando plan nutricional..." },
+              { pct: 90, msg: "Finalizando..." },
+            ]
+        }
         onComplete={() => {}}
       />
     </div>
