@@ -433,8 +433,6 @@ export default function PatientDetail() {
   const [exerciseTypeOther, setExerciseTypeOther] = useState("")
   const [foodsAvoidedPills, setFoodsAvoidedPills] = useState<string[]>([])
   const [foodsAvoidedOther, setFoodsAvoidedOther] = useState("")
-  const [foodPrefsPills, setFoodPrefsPills] = useState<string[]>([])
-  const [foodPrefsOther, setFoodPrefsOther] = useState("")
   const [dislikedPills, setDislikedPills] = useState<string[]>([])
   const [dislikedOther, setDislikedOther] = useState("")
 
@@ -456,9 +454,6 @@ export default function PatientDetail() {
     const [fap, fao] = parseMultiValue(profile.foods_avoided, FOODS_AVOIDED_OPTIONS)
     setFoodsAvoidedPills(fap)
     setFoodsAvoidedOther(fao)
-    const [fpp, fpo] = parseMultiValue(profile.food_preferences, FOOD_PREFERENCES_OPTIONS)
-    setFoodPrefsPills(fpp)
-    setFoodPrefsOther(fpo)
     const [dlp, dlo] = parseMultiValue(profile.disliked_foods, FOOD_PREFERENCES_OPTIONS)
     setDislikedPills(dlp)
     setDislikedOther(dlo)
@@ -573,7 +568,6 @@ export default function PatientDetail() {
       foods_avoided: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),
       medical_history: (fd.get("medical_history") as string) || null,
       dietary_style: buildMultiValue(dietaryPills, dietaryOther),
-      food_preferences: buildMultiValue(foodPrefsPills, foodPrefsOther),
       disliked_foods: buildMultiValue(dislikedPills, dislikedOther),
       water_intake_liters: num("water_intake_liters"),
       activity_level: (fd.get("activity_level") as string) || null,
@@ -1255,20 +1249,6 @@ export default function PatientDetail() {
                   />
                 </div>
 
-                {/* Preferencias alimentarias */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Alimentos que le gustan
-                  </label>
-                  <PillSelect
-                    options={FOOD_PREFERENCES_OPTIONS}
-                    selected={foodPrefsPills}
-                    otherText={foodPrefsOther}
-                    onChange={setFoodPrefsPills}
-                    onOtherChange={setFoodPrefsOther}
-                  />
-                </div>
-
                 {/* Alimentos no deseados */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -1509,8 +1489,7 @@ export default function PatientDetail() {
                   <span className="text-xs text-slate-500">Estilo dietario</span>
                   {renderMultiTag(profile?.dietary_style)}
                 </div>
-                {renderProfileField("Preferencias alimentarias", profile?.food_preferences)}
-                {renderProfileField("Alimentos no deseados", profile?.disliked_foods)}
+                {renderProfileField("Alimentos que NO le gustan", profile?.disliked_foods)}
                 {renderProfileField(
                   "Consumo de agua",
                   profile?.water_intake_liters != null
