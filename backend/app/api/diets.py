@@ -32,6 +32,7 @@ from app.services.diet_service import (
     regenerate_diet,
     update_diet_meals,
 )
+from app.services.email_service import send_email_with_attachment
 
 
 router = APIRouter()
@@ -341,6 +342,86 @@ async def get_diet_pdf(
             "Content-Disposition": f'attachment; filename="diet_{diet_id}.pdf"'
         },
     )
+
+
+@router.post("/{diet_id}/email")
+async def email_diet_pdf(
+    diet_id: int,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    """Send the diet PDF to the patient's registered email."""
+    diet = await db.get(Diet, diet_id)
+    if diet is None or diet.doctor_id != doctor.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Diet not found",
+        )
+
+    patient = await db.get(Patient, diet.patient_id)
+    if patient is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PATIENT_NOT_FOUND",
+        )
+    if not patient.email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PATIENT_NO_EMAIL",
+        )
+
+    # Fetch profile and latest metrics for PDF generation
+    profile = None
+    metrics = None
+    if patient.doctor_id == doctor.id:
+        pr = await db.execute(
+            select(PatientProfile).where(PatientProfile.patient_id == patient.id)
+        )
+        profile = pr.scalar_one_or_none()
+        mr = await db.execute(
+            select(PatientMetrics)
+            .where(PatientMetrics.patient_id == patient.id)
+            .order_by(PatientMetrics.recorded_at.desc())
+            .limit(1)
+        )
+        metrics = mr.scalar_one_or_none()
+
+    # Generate PDF
+    pdf_bytes = build_diet_export_pdf_bytes(
+        diet,
+        patient=patient,
+        profile=profile,
+        metrics=metrics,
+        doctor=doctor,
+    )
+
+    # Build email
+    patient_name = (patient.first_name or "Paciente").strip()
+    subject = f"Tu Plan Nutricional - Dra. Acosta"
+    html_body = f"""<html><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px">
+<h2 style="color:#1e3a5f">Hola {patient_name},</h2>
+<p>La <strong>Dra. Acosta</strong> te comparte tu plan nutricional personalizado.</p>
+<p>Adjunto encontrarás el PDF con tu dieta y recomendaciones.</p>
+<p style="color:#666;font-size:13px;margin-top:30px;border-top:1px solid #eee;padding-top:15px">
+Este correo fue enviado por el consultorio de la Dra. Acosta.<br/>
+Si tienes dudas, responde a este correo o contacta por WhatsApp.
+</p></body></html>"""
+
+    success = send_email_with_attachment(
+        to_email=patient.email,
+        subject=subject,
+        html_body=html_body,
+        attachment_bytes=pdf_bytes,
+        attachment_filename=f"Plan_Nutricional_{patient_name}.pdf",
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="EMAIL_SEND_FAILED",
+        )
+
+    return {"ok": True, "sent_to": patient.email}
 
 
 @router.post("/{diet_id}/soft-delete")
