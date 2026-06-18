@@ -56,3 +56,55 @@ def send_email_sync(to_email: str, subject: str, html_body: str) -> bool:
     except Exception as e:
         logger.exception("Gmail API error: %s", e)
         return False
+
+
+def send_email_with_attachment(
+    to_email: str,
+    subject: str,
+    html_body: str,
+    attachment_bytes: bytes,
+    attachment_filename: str,
+    attachment_mimetype: str = "application/pdf",
+) -> bool:
+    """Send email with a file attachment via Gmail API."""
+    import mimetypes
+    from email.mime.application import MIMEApplication
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    try:
+        access_token = _get_access_token()
+
+        msg = MIMEMultipart()
+        msg["To"] = to_email
+        msg["From"] = settings.GMAIL_FROM_EMAIL or "Dra. Acosta"
+        msg["Subject"] = subject
+
+        # Attach HTML body
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        # Attach file
+        part = MIMEApplication(attachment_bytes, _subtype="pdf")
+        part.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=attachment_filename,
+        )
+        msg.attach(part)
+
+        raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+
+        url = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+        body = {"raw": raw}
+
+        with httpx.Client(timeout=30) as client:
+            r = client.post(url, headers=headers, json=body)
+            r.raise_for_status()
+            return True
+    except Exception as e:
+        logger.exception("Gmail API attachment error: %s", e)
+        return False
