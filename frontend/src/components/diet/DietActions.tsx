@@ -11,9 +11,12 @@ type Props = {
   onQuickAdjust: (key: string, label: string) => void
   onDownloadPdf: () => void
   onSharePdf?: () => void
+  onSendEmail?: () => void
   onToggleEdit?: () => void
   editing?: boolean
   loading: boolean
+  emailLoading?: boolean
+  patientEmail?: string | null
 }
 
 export default function DietActions({
@@ -24,11 +27,22 @@ export default function DietActions({
   onQuickAdjust,
   onDownloadPdf,
   onSharePdf,
+  onSendEmail,
   onToggleEdit,
   editing,
   loading,
+  emailLoading = false,
+  patientEmail,
 }: Props) {
   const [showQuickAdjust, setShowQuickAdjust] = useState(false)
+  const isMobile = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)
+
+  const handleSendEmail = () => {
+    if (!patientEmail) {
+      return  // parent handles the toast
+    }
+    onSendEmail?.()
+  }
   const isEditable = status === "pending_approval" || status === "generated"
 
   if (status === "pending_approval") {
@@ -59,21 +73,38 @@ export default function DietActions({
   }
 
   if (status === "generated") {
+    const noEmail = !patientEmail
     return (
       <div className="space-y-2">
-        <Button onClick={onDownloadPdf} className="w-full">
-          📄 Descargar PDF
+        <Button
+          onClick={handleSendEmail}
+          disabled={emailLoading || noEmail}
+          className="w-full"
+          title={noEmail ? "El paciente no tiene correo registrado" : undefined}
+        >
+          {emailLoading ? "⏳ Enviando..." : "📧 Enviar por correo"}
         </Button>
-        {onSharePdf && (
-          <Button
-            variant="secondary"
-            onClick={onSharePdf}
-            className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50"
-          >
-            <span className="flex items-center justify-center gap-1.5">
-              <Share size={14} />
-              Compartir PDF
-            </span>
+        {noEmail && (
+          <p className="text-xs text-amber-600 text-center">
+            ⚠️ El paciente no tiene correo registrado
+          </p>
+        )}
+        {isMobile ? (
+          onSharePdf && (
+            <Button
+              variant="secondary"
+              onClick={onSharePdf}
+              className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50"
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Share size={14} />
+                Compartir
+              </span>
+            </Button>
+          )
+        ) : (
+          <Button onClick={onDownloadPdf} className="w-full">
+            📄 Descargar PDF
           </Button>
         )}
         <Button variant="ghost" onClick={onToggleEdit} className="w-full text-sm">
