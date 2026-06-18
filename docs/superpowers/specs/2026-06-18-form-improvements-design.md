@@ -6,10 +6,12 @@
 
 ## Overview
 
-Three improvements to the doctor's patient form (PatientDetail):
+Five improvements to the doctor's patient form and validation messages:
 1. Fix country/city selector not appearing (replace plain inputs with LocationSelector)
 2. Remove forced decimal formatting from metric inputs (weight, height, water)
 3. Convert free-text food preference fields to selectable pills
+4. Translate all validation/diet-blocker messages to Spanish and make them doctor-friendly
+5. Add save-time warning when fields required for diet creation are missing
 
 ---
 
@@ -99,6 +101,85 @@ Huevos, Lácteos, Frutos secos, Dulces
 | File | Change |
 |------|--------|
 | `frontend/src/pages/PatientDetail.tsx` | Add constant, state, replace textareas with PillSelect |
+
+---
+
+## Fix 4: Spanish & Doctor-Friendly Validation Messages
+
+### Current State
+7 messages in `diet_eligibility.py` are in English. Several error messages in `diet_service.py` and `diets.py` are in English. Some `input_builder.py` and `engine.py` messages are in Spanish but use technical jargon.
+
+### Desired Behavior
+All user-facing messages in Spanish, written for a doctor (not a programmer).
+
+### Message translation table
+
+| File | Line | Current (EN/Technical) | New (ES Doctor-Friendly) |
+|------|------|------------------------|--------------------------|
+| `diet_eligibility.py` | 16 | `Missing patient birth_date` | `Falta la fecha de nacimiento del paciente` |
+| `diet_eligibility.py` | 18 | `Missing patient sex` | `Falta el sexo del paciente` |
+| `diet_eligibility.py` | 20 | `Missing patient country or city` | `Falta el país o ciudad del paciente` |
+| `diet_eligibility.py` | 22 | `Missing clinical profile` | `Falta completar el perfil clínico del paciente` |
+| `diet_eligibility.py` | 25 | `Missing profile objective` | `Falta el objetivo del paciente en el perfil clínico` |
+| `diet_eligibility.py` | 31 | `Missing latest weight (add a metric)` | `Falta registrar el peso del paciente en métricas` |
+| `diet_eligibility.py` | 33 | `Missing latest height (add a metric)` | `Falta registrar la altura del paciente en métricas` |
+| `diet_service.py` | 72 | `Patient not found` | `Paciente no encontrado` |
+| `diet_service.py` | 226, 232 | `Patient data incomplete for diet generation` | `Faltan datos del paciente para crear la dieta` |
+| `diet_service.py` | 255 | `Model error: {e}` | `Error al generar la dieta. Revise los datos e intente de nuevo.` |
+| `diets.py` | 141, 153, 284 | `Diet not found` | `Dieta no encontrada` |
+| `diet_service.py` | 302 | `La dieta no está pendiente de aprobación` | (OK, already Spanish) |
+| `input_builder.py` | 46 | `Falta métrica numérica.` | `Falta un valor numérico requerido para el cálculo.` |
+| `input_builder.py` | 57 | `Sexo no reconocido para el cálculo nutricional (use male/female o equivalente).` | `El sexo ingresado no es válido. Use Masculino o Femenino.` |
+| `engine.py` | 124 | `Edad fuera del rango soportado (14–100 años) para este motor.` | `La edad debe estar entre 14 y 100 años.` |
+| `engine.py` | 240-242 | `Hay condiciones de salud no clasificadas en las reglas del sistema...` | `El paciente tiene condiciones de salud que requieren revisión manual antes de generar la dieta.` |
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `backend/app/logic/diet_eligibility.py` | Translate 7 messages to Spanish |
+| `backend/app/services/diet_service.py` | Translate 3 messages to Spanish |
+| `backend/app/api/diets.py` | Translate "Diet not found" (3 occurrences) |
+| `backend/app/nutrition/input_builder.py` | Simplify 2 technical messages |
+| `backend/app/nutrition/engine.py` | Simplify 2 technical messages |
+
+---
+
+## Fix 5: Save-Time Warning for Missing Diet Fields
+
+### Current State
+When doctor saves patient data, there is no validation for diet readiness. The doctor only discovers missing fields when they try to generate a diet and get a blocking error.
+
+### Desired Behavior
+When doctor clicks "Guardar" on patient data or profile, if any of the 10 diet-required fields are missing, show a **warning toast** listing what's missing. The save still succeeds — it's just a warning, not a blocker.
+
+### Implementation
+
+#### Frontend: `PatientDetail.tsx`
+After successful save of "Datos Demográficos" or "Perfil Clínico":
+1. Check saved data against the 10 required fields for diet generation
+2. If any are missing, call `addToast()` with an info message listing them
+3. Format example: `"Para crear una dieta, falta: fecha de nacimiento, peso, altura."`
+
+#### Required fields to check (subset verifiable from frontend state):
+| # | Field | Check |
+|---|-------|-------|
+| 1 | Fecha nacimiento | `!patient.birth_date` |
+| 2 | Sexo | `!patient.sex` |
+| 3 | País | `!patient.country` |
+| 4 | Ciudad | `!patient.city` |
+| 5 | Objetivo | `!profile.objective` |
+| 6 | Alergias alimentarias | `!profile.food_allergies` |
+| 7 | Alimentos a evitar | `!profile.foods_avoided` |
+| 8 | Peso | No latest metric with weight_kg |
+| 9 | Altura | No latest metric with height_cm |
+| 10 | Perfil clínico existe | `!profile` or `!profile.completed_at` |
+
+Note: the frontend check is best-effort (warns about obvious gaps). The backend remains the authoritative blocker at diet generation time.
+
+### Files Changed
+| File | Change |
+|------|--------|
+| `frontend/src/pages/PatientDetail.tsx` | Add diet-readiness check after save, show info toast |
 
 ---
 
