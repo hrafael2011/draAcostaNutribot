@@ -89,20 +89,24 @@ export default function DietActions({
           </p>
         )}
         {onSharePdf && (
-          <Button
-            variant="secondary"
-            onClick={onSharePdf}
-            className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50 md:hidden"
-          >
-            <span className="flex items-center justify-center gap-1.5">
-              <Share size={14} />
-              Compartir
-            </span>
-          </Button>
+          <div className="md:hidden">
+            <Button
+              variant="secondary"
+              onClick={onSharePdf}
+              className="w-full border-emerald-500 text-emerald-700 hover:bg-emerald-50"
+            >
+              <span className="flex items-center justify-center gap-1.5">
+                <Share size={14} />
+                Compartir
+              </span>
+            </Button>
+          </div>
         )}
-        <Button onClick={onDownloadPdf} className="w-full hidden md:block">
-          📄 Descargar PDF
-        </Button>
+        <div className="hidden md:block">
+          <Button onClick={onDownloadPdf} className="w-full">
+            📄 Descargar PDF
+          </Button>
+        </div>
         <Button variant="ghost" onClick={onToggleEdit} className="w-full text-sm">
           <span className="flex items-center justify-center gap-1.5">
             <PencilSimple size={14} />
