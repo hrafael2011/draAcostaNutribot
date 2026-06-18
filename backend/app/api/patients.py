@@ -271,6 +271,30 @@ async def add_metrics(
     return metric
 
 
+@router.patch(
+    "/{patient_id}/metrics/{metric_id}",
+    response_model=PatientMetricsOut,
+)
+async def update_metrics(
+    patient_id: int,
+    metric_id: int,
+    body: PatientMetricsCreate,
+    db: AsyncSession = Depends(get_db),
+    doctor: Doctor = Depends(get_current_doctor),
+):
+    await _get_patient_for_doctor(db, doctor.id, patient_id)
+    metric = await db.get(PatientMetrics, metric_id)
+    if metric is None or metric.patient_id != patient_id:
+        raise HTTPException(status_code=404, detail="Métrica no encontrada")
+    update_data = body.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(metric, key, value)
+    metric.recorded_at = body.recorded_at or metric.recorded_at
+    await db.commit()
+    await db.refresh(metric)
+    return metric
+
+
 @router.get("/{patient_id}/summary", response_model=PatientSummaryOut)
 async def patient_summary(
     patient_id: int,

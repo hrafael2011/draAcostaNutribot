@@ -411,6 +411,7 @@ export default function PatientDetail() {
   const [editCountry, setEditCountry] = useState(patient?.country ?? "")
   const [editCity, setEditCity] = useState(patient?.city ?? "")
   const [showMetricForm, setShowMetricForm] = useState(false)
+  const [editingMetricId, setEditingMetricId] = useState<number | null>(null)
 
   // Form keys to force re-mount with fresh defaults
   const [dataFormKey, setDataFormKey] = useState(0)
@@ -635,11 +636,38 @@ export default function PatientDetail() {
     })
   }
 
+  function resetMetricForm() {
+    setMWeight("")
+    setMHeight("")
+    setMNeck("")
+    setMChest("")
+    setMWaist("")
+    setMHip("")
+    setMLeg("")
+    setMCalf("")
+    setMNotes("")
+    setEditingMetricId(null)
+  }
+
+  function populateMetricForm(m: PatientMetric) {
+    setMWeight(m.weight_kg != null ? String(m.weight_kg) : "")
+    setMHeight(m.height_cm != null ? String(m.height_cm) : "")
+    setMNeck(m.neck_cm != null ? String(m.neck_cm) : "")
+    setMChest(m.chest_cm != null ? String(m.chest_cm) : "")
+    setMWaist(m.waist_cm != null ? String(m.waist_cm) : "")
+    setMHip(m.hip_cm != null ? String(m.hip_cm) : "")
+    setMLeg(m.leg_cm != null ? String(m.leg_cm) : "")
+    setMCalf(m.calf_cm != null ? String(m.calf_cm) : "")
+    setMNotes(m.notes ?? "")
+    setEditingMetricId(m.id)
+    setShowMetricForm(true)
+  }
+
   async function onAddMetric(e: FormEvent) {
     e.preventDefault()
     setError(null)
     try {
-      await addMetric(patientId, {
+      const body = {
         weight_kg: mWeight ? Number(mWeight) : null,
         height_cm: mHeight ? Number(mHeight) : null,
         neck_cm: mNeck ? Number(mNeck) : null,
@@ -650,22 +678,21 @@ export default function PatientDetail() {
         calf_cm: mCalf ? Number(mCalf) : null,
         notes: mNotes || null,
         source: "admin",
-      })
-      setMWeight("")
-      setMHeight("")
-      setMNeck("")
-      setMChest("")
-      setMWaist("")
-      setMHip("")
-      setMLeg("")
-      setMCalf("")
-      setMNotes("")
+      }
+      if (editingMetricId != null) {
+        const { updateMetric } = await import("../services/api")
+        await updateMetric(patientId, editingMetricId, body)
+        addToast("Medición actualizada", "success")
+      } else {
+        await addMetric(patientId, body)
+        addToast("Medición registrada", "success")
+      }
+      resetMetricForm()
       setShowMetricForm(false)
       await refreshMetrics()
-      addToast("Medición registrada", "success")
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error")
-      addToast(err instanceof Error ? err.message : "Error al registrar", "error")
+      addToast(err instanceof Error ? err.message : "Error al guardar métrica", "error")
     }
   }
 
@@ -1564,7 +1591,7 @@ export default function PatientDetail() {
           </h2>
           <button
             type="button"
-            onClick={() => setShowMetricForm((v) => !v)}
+            onClick={() => { setShowMetricForm((v) => !v); if (showMetricForm) resetMetricForm() }}
             className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
           >
             {showMetricForm ? "Cancelar" : "+ Registrar Métricas"}
@@ -1576,7 +1603,9 @@ export default function PatientDetail() {
             onSubmit={onAddMetric}
             className="mb-6 p-4 bg-slate-50 rounded-xl space-y-3 max-w-md"
           >
-            <p className="text-sm font-medium text-slate-700">Nueva medición</p>
+            <p className="text-sm font-medium text-slate-700">
+              {editingMetricId != null ? "Editar medición" : "Nueva medición"}
+            </p>
             <div>
               <label className="block text-xs font-medium text-slate-500 mb-1">
                 Peso
@@ -1678,6 +1707,9 @@ export default function PatientDetail() {
                   <th className="text-left py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Fuente
                   </th>
+                  <th className="text-right py-2.5 px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1708,6 +1740,15 @@ export default function PatientDetail() {
                         </td>
                         <td className="py-2.5 px-3 text-slate-500 capitalize">
                           {m.source}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => populateMetricForm(m)}
+                            className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                          >
+                            Editar
+                          </button>
                         </td>
                       </tr>
                     )

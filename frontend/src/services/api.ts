@@ -200,6 +200,13 @@ export function addMetric(patientId: number, body: Record<string, unknown>) {
   }).then((r) => parseJson<PatientMetric>(r))
 }
 
+export function updateMetric(patientId: number, metricId: number, body: Record<string, unknown>) {
+  return authFetch(`/patients/${patientId}/metrics/${metricId}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  }).then((r) => parseJson<PatientMetric>(r))
+}
+
 export function getPatientSummary(patientId: number) {
   return authFetch(`/patients/${patientId}/summary`).then((r) =>
     parseJson<PatientSummary>(r),
