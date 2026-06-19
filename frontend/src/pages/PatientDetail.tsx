@@ -28,8 +28,6 @@ const DISEASE_OPTIONS = [
   "Hipertensión",
   "Problemas renales",
   "Dislipidemia",
-  "Hipotiroidismo",
-  "Hernias lumbares",
 ]
 
 const ALLERGY_OPTIONS = [
@@ -67,9 +65,9 @@ const FOODS_AVOIDED_OPTIONS = [
 ]
 
 const FOOD_PREFERENCES_OPTIONS = [
-  "Carnes rojas", "Pollo", "Pescado", "Mariscos", "Cerdo",
-  "Verduras", "Frutas", "Arroz", "Pasta", "Pan", "Legumbres",
-  "Huevos", "Lácteos", "Frutos secos", "Dulces",
+  "Pollo", "Pescado", "Verduras", "Frutas", "Arroz",
+  "Pasta", "Pan", "Legumbres", "Huevos", "Lácteos",
+  "Frutos secos", "Dulces",
 ]
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -339,7 +337,7 @@ const profileLabels: Record<string, string> = {
   food_allergies: "Alergias alimentarias",
   foods_avoided: "Alimentos a evitar",
   medical_history: "Historial médico",
-  dietary_style: "Estilo de alimentación",
+  dietary_style: "Patrón alimentario",
   food_preferences: "Alimentos que le gustan",
   water_intake_liters: "Agua (L/día)",
   activity_level: "Actividad física",
@@ -347,8 +345,7 @@ const profileLabels: Record<string, string> = {
   sleep_quality: "Calidad del sueño",
   sleep_hours: "Horas de sueño",
   budget_level: "Presupuesto",
-  adherence_level: "Compromiso con la dieta",
-  exercise_frequency_per_week: "Ejercicio (días/sem)",
+  adherence_level: "Disposición al cambio",
   exercise_type: "Tipo de ejercicio",
   extra_notes: "Notas adicionales",
   weight_kg: "Peso",
@@ -577,7 +574,6 @@ export default function PatientDetail() {
       sleep_hours: num("sleep_hours"),
       budget_level: (fd.get("budget_level") as string) || null,
       adherence_level: num("adherence_level"),
-      exercise_frequency_per_week: num("exercise_frequency_per_week"),
       exercise_type: buildMultiValue(exerciseTypePills, exerciseTypeOther),
       extra_notes: (fd.get("extra_notes") as string) || null,
     }
@@ -1274,10 +1270,10 @@ export default function PatientDetail() {
             <div className="p-4 bg-slate-50 rounded-xl">
               <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Perfil Nutricional</h4>
               <div className="space-y-4">
-                {/* Estilo dietario */}
+                {/* Patrón alimentario */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Estilo dietario
+                    Patrón alimentario
                   </label>
                   <PillSelect
                     options={DIETARY_STYLE_OPTIONS}
@@ -1400,7 +1396,7 @@ export default function PatientDetail() {
                 {/* Presupuesto */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Presupuesto para alimentación
+                    Presupuesto mensual estimado
                   </label>
                   <select
                     name="budget_level"
@@ -1418,7 +1414,7 @@ export default function PatientDetail() {
                 {/* Adherencia */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Compromiso con la dieta
+                    Disposición al cambio
                   </label>
                   <select
                     name="adherence_level"
@@ -1431,25 +1427,6 @@ export default function PatientDetail() {
                     <option value="3">3 — Moderada</option>
                     <option value="4">4 — Alta</option>
                     <option value="5">5 — Muy alta</option>
-                  </select>
-                </div>
-
-                {/* Días de ejercicio */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Días de ejercicio por semana
-                  </label>
-                  <select
-                    name="exercise_frequency_per_week"
-                    defaultValue={profile?.exercise_frequency_per_week ?? ""}
-                    className={SELECT_CLASSES}
-                  >
-                    <option value="">— Seleccionar —</option>
-                    {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
-                      <option key={n} value={n}>
-                        {n} {n === 1 ? "día" : "días"}
-                      </option>
-                    ))}
                   </select>
                 </div>
 
@@ -1531,7 +1508,7 @@ export default function PatientDetail() {
                   {renderMultiTag(profile?.food_preferences) || <span className="text-sm text-slate-400">—</span>}
                 </div>
                 <div>
-                  <span className="text-xs text-slate-500">Estilo dietario</span>
+                  <span className="text-xs text-slate-500">Patrón alimentario</span>
                   {renderMultiTag(profile?.dietary_style)}
                 </div>
                 {renderProfileField(
@@ -1562,14 +1539,8 @@ export default function PatientDetail() {
                 )}
                 {renderProfileField("Presupuesto", profile?.budget_level)}
                 {renderProfileField(
-                  "Compromiso con la dieta",
+                  "Disposición al cambio",
                   profile?.adherence_level != null ? `${profile.adherence_level}/5` : null
-                )}
-                {renderProfileField(
-                  "Ejercicio",
-                  profile?.exercise_frequency_per_week != null
-                    ? `${profile.exercise_frequency_per_week} días/sem`
-                    : null
                 )}
                 <div>
                   <span className="text-xs text-slate-500">Tipo de ejercicio</span>

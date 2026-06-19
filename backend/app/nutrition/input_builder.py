@@ -67,10 +67,8 @@ def _normalize_sex(raw: Optional[str]) -> SexForBmr:
         return SexForBmr.MALE
     if s in ("f", "female", "femenino", "mujer"):
         return SexForBmr.FEMALE
-    raise NutritionInputBuildError(
-        "unsupported_sex",
-        "El sexo ingresado no es válido. Use Masculino o Femenino.",
-    )
+    # Default to female for unrecognized values (e.g. "Otro", "other")
+    return SexForBmr.FEMALE
 
 
 def _normalize_activity(raw: Optional[str]) -> tuple[NormalizedActivityLevel, str | None]:

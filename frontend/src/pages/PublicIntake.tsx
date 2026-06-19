@@ -276,7 +276,6 @@ export default function PublicIntake() {
                       <option value="">Seleccionar...</option>
                       <option value="Femenino">Femenino</option>
                       <option value="Masculino">Masculino</option>
-                      <option value="Otro">Otro</option>
                     </select>
                   </div>
                   {linkType === "register" && (

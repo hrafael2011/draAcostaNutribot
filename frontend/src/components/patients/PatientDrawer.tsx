@@ -62,20 +62,17 @@ const INITIAL_FORM: PatientFormData = {
 
 const DIETARY_STYLES: { value: string; label: string }[] = [
   { value: "", label: "Sin especificar" },
-  { value: "omnivore", label: "Omnívoro" },
-  { value: "vegetarian", label: "Vegetariano" },
-  { value: "vegan", label: "Vegano" },
-  { value: "pescatarian", label: "Pescetariano" },
-  { value: "keto", label: "Keto" },
-  { value: "paleo", label: "Paleo" },
-  { value: "mediterranean", label: "Mediterráneo" },
-  { value: "no_preference", label: "Sin preferencia" },
+  { value: "Equilibrada", label: "Equilibrada" },
+  { value: "Baja en carbohidratos", label: "Baja en carbohidratos" },
+  { value: "Alta en carbohidratos", label: "Alta en carbohidratos" },
+  { value: "Alta en proteína", label: "Alta en proteína" },
+  { value: "Mediterránea", label: "Mediterránea" },
 ];
 
 const SEX_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: "No especificar" },
-  { value: "female", label: "Femenino" },
-  { value: "male", label: "Masculino" },
+  { value: "Femenino", label: "Femenino" },
+  { value: "Masculino", label: "Masculino" },
 ];
 
 const INPUT_CLASS =
