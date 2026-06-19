@@ -447,6 +447,13 @@ async def restore_diet(
     diet = await db.get(Diet, diet_id)
     if diet is None or diet.doctor_id != doctor.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dieta no encontrada")
+    # Check if the associated patient is in the trash
+    patient = await db.get(Patient, diet.patient_id)
+    if patient and patient.deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No se puede restaurar la dieta porque el paciente está en la papelera. Restaure al paciente primero."
+        )
     diet.deleted_at = None
     await db.commit()
     return {"ok": True}

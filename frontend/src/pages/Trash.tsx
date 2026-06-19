@@ -80,8 +80,8 @@ export default function TrashPage() {
       }
       if (type === "patients") fetchPatients()
       else fetchDiets()
-    } catch {
-      addToast("Error al restaurar", "error")
+    } catch (err) {
+      addToast(err instanceof Error ? err.message : "Error al restaurar", "error")
     }
   }
 
