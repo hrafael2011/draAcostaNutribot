@@ -243,20 +243,24 @@ export default function PublicIntake() {
               <section>
                 <h2 className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-4">Datos personales</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Nombre <span className="text-red-500">*</span>
-                    </label>
-                    <input name="first_name" required
-                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                      Apellido <span className="text-red-500">*</span>
-                    </label>
-                    <input name="last_name" required
-                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
-                  </div>
+                  {linkType !== "update" && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Nombre <span className="text-red-500">*</span>
+                        </label>
+                        <input name="first_name" required
+                          className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                          Apellido <span className="text-red-500">*</span>
+                        </label>
+                        <input name="last_name" required
+                          className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
+                      </div>
+                    </>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                       Fecha de nacimiento <span className="text-red-500">*</span>
@@ -267,8 +271,13 @@ export default function PublicIntake() {
                     <label className="block text-sm font-medium text-slate-700 mb-1.5">
                       Sexo <span className="text-red-500">*</span>
                     </label>
-                    <input name="sex" required placeholder="Ej. Femenino / Masculino"
-                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
+                    <select name="sex" required
+                      className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors">
+                      <option value="">Seleccionar...</option>
+                      <option value="Femenino">Femenino</option>
+                      <option value="Masculino">Masculino</option>
+                      <option value="Otro">Otro</option>
+                    </select>
                   </div>
                   {linkType === "register" && (
                     <div>
@@ -298,10 +307,10 @@ export default function PublicIntake() {
                 </div>
               </section>
 
-              {/* Objetivo y preferencias — solo register */}
+              {/* Objetivo y alimentos a evitar — solo register */}
               {linkType === "register" && (
                 <section>
-                  <h2 className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-4">Objetivo y preferencias</h2>
+                  <h2 className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-4">Objetivo y alimentos a evitar</h2>
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">

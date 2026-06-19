@@ -434,7 +434,8 @@ export default function PatientDetail() {
   const [exerciseTypeOther, setExerciseTypeOther] = useState("")
   const [foodsAvoidedPills, setFoodsAvoidedPills] = useState<string[]>([])
   const [foodsAvoidedOther, setFoodsAvoidedOther] = useState("")
-
+  const [foodPrefsPills, setFoodPrefsPills] = useState<string[]>([])
+  const [foodPrefsOther, setFoodPrefsOther] = useState("")
 
   // Inicializar pills desde perfil cargado
   useEffect(() => {
@@ -453,7 +454,10 @@ export default function PatientDetail() {
     setExerciseTypeOther(eto)
     const [fap, fao] = parseMultiValue(profile.foods_avoided, FOODS_AVOIDED_OPTIONS)
     setFoodsAvoidedPills(fap)
-    setFoodsAvoidedOther(fao)  }, [profile])
+    setFoodsAvoidedOther(fao)
+    const [fpp, fpo] = parseMultiValue(profile.food_preferences, FOOD_PREFERENCES_OPTIONS)
+    setFoodPrefsPills(fpp)
+    setFoodPrefsOther(fpo)  }, [profile])
 
   // ── Carga inicial de datos ─────────────────────────────────────────────
   useEffect(() => {
@@ -562,6 +566,7 @@ export default function PatientDetail() {
       medications: (fd.get("medications") as string) || null,
       food_allergies: buildMultiValue(allergiesPills, allergiesOther),
       foods_avoided: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),
+      food_preferences: buildMultiValue(foodPrefsPills, foodPrefsOther),
       medical_history: (fd.get("medical_history") as string) || null,
       dietary_style: buildMultiValue(dietaryPills, dietaryOther),
       disliked_foods: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),  // dual-write for backward compat
@@ -1283,6 +1288,20 @@ export default function PatientDetail() {
                   />
                 </div>
 
+                {/* Alimentos que SÍ le gustan */}
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">
+                    Alimentos que SÍ le gustan
+                  </label>
+                  <PillSelect
+                    options={FOOD_PREFERENCES_OPTIONS}
+                    selected={foodPrefsPills}
+                    otherText={foodPrefsOther}
+                    onChange={setFoodPrefsPills}
+                    onOtherChange={setFoodPrefsOther}
+                  />
+                </div>
+
                 {/* Agua */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -1507,6 +1526,10 @@ export default function PatientDetail() {
             <div className="p-4 bg-slate-50 rounded-xl">
               <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Perfil Nutricional</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+                <div>
+                  <span className="text-xs text-slate-500">Alimentos que SÍ le gustan</span>
+                  {renderMultiTag(profile?.food_preferences) || <span className="text-sm text-slate-400">—</span>}
+                </div>
                 <div>
                   <span className="text-xs text-slate-500">Estilo dietario</span>
                   {renderMultiTag(profile?.dietary_style)}
