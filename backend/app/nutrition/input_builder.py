@@ -128,10 +128,14 @@ def _normalize_goal(raw: Optional[str]) -> tuple[NormalizedNutritionGoal, str | 
         "reduccion",
         "reducción",
         "bajar_peso",
+        "health_improvement",
+        "mejora_de_salud",
+        "mejora de salud",
     ):
         return NormalizedNutritionGoal.FAT_LOSS, None
     if s in ("muscle_gain", "gain_muscle", "gainmuscle", "hipertrofia", "masa", "musculo",
-             "músculo", "ganar_musculo", "ganar_músculo", "ganar musculo", "ganar músculo"):
+             "músculo", "ganar_musculo", "ganar_músculo", "ganar musculo", "ganar músculo",
+             "sports_performance", "rendimiento_deportivo", "rendimiento deportivo"):
         return NormalizedNutritionGoal.MUSCLE_GAIN, None
     if s in ("weight_gain", "gain_weight", "gainweight", "aumento", "subir",
              "subir_de_peso", "subir de peso", "aumentar_peso", "aumentar peso"):
