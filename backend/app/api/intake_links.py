@@ -192,7 +192,7 @@ async def public_submit(
         db.add(profile)
 
     profile.objective = body.objective
-    profile.disliked_foods = body.disliked_foods
+    profile.foods_avoided = body.disliked_foods
     profile.completed_by_patient = True
     profile.updated_at = utcnow()
 

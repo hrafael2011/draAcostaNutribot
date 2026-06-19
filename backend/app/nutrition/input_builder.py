@@ -8,6 +8,21 @@ from decimal import Decimal
 from typing import Optional
 
 from app.logic.profile import norm
+
+
+def _merge_food_lists(a: str | None, b: str | None) -> str | None:
+    """Merge two comma-separated food lists, deduplicating entries."""
+    items: list[str] = []
+    seen: set[str] = set()
+    for raw in (a, b):
+        if not raw or not raw.strip():
+            continue
+        for item in raw.split(","):
+            cleaned = item.strip().lower()
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                items.append(item.strip())
+    return ", ".join(items) if items else None
 from app.models import Patient, PatientMetrics, PatientProfile
 from app.nutrition.contract import (
     DietStyle,
@@ -158,7 +173,7 @@ def build_patient_contextual(profile: PatientProfile) -> PatientContextualFactor
         exercise_type=profile.exercise_type,
         exercise_frequency_per_week=profile.exercise_frequency_per_week,
         food_preferences=profile.food_preferences,
-        disliked_foods=profile.disliked_foods,
+        disliked_foods=_merge_food_lists(profile.disliked_foods, profile.foods_avoided),
         extra_notes=profile.extra_notes,
         water_intake_liters=float(profile.water_intake_liters)
         if profile.water_intake_liters is not None
