@@ -98,7 +98,7 @@ export default function PublicIntake() {
       country,
       city,
       objective: objective,
-      disliked_foods: optStr("disliked_foods"),
+      disliked_foods: optStr("foods_avoided"),
       whatsapp: optStr("whatsapp"),
       email: optStr("email") || null,
     }
@@ -118,7 +118,7 @@ export default function PublicIntake() {
     ]
     if (str("whatsapp")) changes.push({ label: "WhatsApp", newValue: str("whatsapp"), isNew: true })
     if (str("email")) changes.push({ label: "Email", newValue: str("email"), isNew: true })
-    if (str("disliked_foods")) changes.push({ label: "Alimentos que no le gustan", newValue: str("disliked_foods"), isNew: true })
+    if (str("foods_avoided")) changes.push({ label: "Alimentos a evitar", newValue: str("foods_avoided"), isNew: true })
 
     setPendingBody(body)
     setConfirmChanges(changes)
@@ -315,7 +315,7 @@ export default function PublicIntake() {
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1.5">Alimentos que NO te gustan o NO consumes</label>
                       <p className="text-xs text-slate-500 mb-2">Ej: hígado, cilantro, mariscos, picante...</p>
-                      <textarea name="disliked_foods" rows={2}
+                      <textarea name="foods_avoided" rows={2}
                         className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors resize-none" />
                     </div>
                   </div>

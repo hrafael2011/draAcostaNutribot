@@ -346,7 +346,6 @@ const profileLabels: Record<string, string> = {
   medical_history: "Historial médico",
   dietary_style: "Estilo de alimentación",
   food_preferences: "Alimentos que le gustan",
-  disliked_foods: "Alimentos que NO le gustan",
   water_intake_liters: "Agua (L/día)",
   activity_level: "Actividad física",
   stress_level: "Estrés",
@@ -440,8 +439,7 @@ export default function PatientDetail() {
   const [exerciseTypeOther, setExerciseTypeOther] = useState("")
   const [foodsAvoidedPills, setFoodsAvoidedPills] = useState<string[]>([])
   const [foodsAvoidedOther, setFoodsAvoidedOther] = useState("")
-  const [dislikedPills, setDislikedPills] = useState<string[]>([])
-  const [dislikedOther, setDislikedOther] = useState("")
+
 
   // Inicializar pills desde perfil cargado
   useEffect(() => {
@@ -460,11 +458,7 @@ export default function PatientDetail() {
     setExerciseTypeOther(eto)
     const [fap, fao] = parseMultiValue(profile.foods_avoided, FOODS_AVOIDED_OPTIONS)
     setFoodsAvoidedPills(fap)
-    setFoodsAvoidedOther(fao)
-    const [dlp, dlo] = parseMultiValue(profile.disliked_foods, FOOD_PREFERENCES_OPTIONS)
-    setDislikedPills(dlp)
-    setDislikedOther(dlo)
-  }, [profile])
+    setFoodsAvoidedOther(fao)  }, [profile])
 
   // ── Carga inicial de datos ─────────────────────────────────────────────
   useEffect(() => {
@@ -575,7 +569,7 @@ export default function PatientDetail() {
       foods_avoided: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),
       medical_history: (fd.get("medical_history") as string) || null,
       dietary_style: buildMultiValue(dietaryPills, dietaryOther),
-      disliked_foods: buildMultiValue(dislikedPills, dislikedOther),
+      disliked_foods: buildMultiValue(foodsAvoidedPills, foodsAvoidedOther),  // dual-write for backward compat
       water_intake_liters: num("water_intake_liters"),
       activity_level: (fd.get("activity_level") as string) || null,
       stress_level: num("stress_level"),
@@ -1294,20 +1288,6 @@ export default function PatientDetail() {
                   />
                 </div>
 
-                {/* Alimentos no deseados */}
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Alimentos que NO le gustan
-                  </label>
-                  <PillSelect
-                    options={FOOD_PREFERENCES_OPTIONS}
-                    selected={dislikedPills}
-                    otherText={dislikedOther}
-                    onChange={setDislikedPills}
-                    onOtherChange={setDislikedOther}
-                  />
-                </div>
-
                 {/* Agua */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
@@ -1536,7 +1516,6 @@ export default function PatientDetail() {
                   <span className="text-xs text-slate-500">Estilo dietario</span>
                   {renderMultiTag(profile?.dietary_style)}
                 </div>
-                {renderProfileField("Alimentos que NO le gustan", profile?.disliked_foods)}
                 {renderProfileField(
                   "Consumo de agua",
                   profile?.water_intake_liters != null
