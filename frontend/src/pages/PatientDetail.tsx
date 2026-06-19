@@ -1316,6 +1316,7 @@ export default function PatientDetail() {
                   <input
                     name="water_intake_liters"
                     type="number"
+                    step="0.1"
                     min="0"
                     max="10"
                     defaultValue={profile?.water_intake_liters ?? ""}
@@ -1394,6 +1395,7 @@ export default function PatientDetail() {
                   <input
                     name="sleep_hours"
                     type="number"
+                    step="0.5"
                     min="3"
                     max="12"
                     defaultValue={profile?.sleep_hours ?? ""}

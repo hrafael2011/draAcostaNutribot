@@ -49,6 +49,7 @@ export default function WeightInput({
     <div className="flex gap-2 flex-wrap">
       <input
         type="number"
+        step="0.1"
         min="0"
         value={displayValue}
         onChange={handleValueChange}
