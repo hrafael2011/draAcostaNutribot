@@ -60,6 +60,7 @@ export default function Diets() {
   const [patientNameMap, setPatientNameMap] = useState<
     Record<number, { firstName: string; lastName: string; city?: string | null }>
   >({})
+  const [patientsCount, setPatientsCount] = useState(0)
 
   /* ---------- form state ---------- */
   const [formOpen, setFormOpen] = useState(false)
@@ -144,6 +145,7 @@ export default function Diets() {
           map[p.id] = { firstName: p.first_name, lastName: p.last_name, city: p.city }
         }
         setPatientNameMap(map)
+        setPatientsCount(res.total)
       })
       .catch(() => {})
   }, [])
@@ -242,8 +244,14 @@ export default function Diets() {
         <h1 className="text-2xl font-bold text-slate-900">Dietas</h1>
         <button
           type="button"
+          disabled={patientsCount === 0}
           onClick={() => setFormOpen(!formOpen)}
-          className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-500"
+          className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors ${
+            patientsCount === 0
+              ? "bg-slate-400 cursor-not-allowed"
+              : "bg-emerald-600 hover:bg-emerald-500"
+          }`}
+          title={patientsCount === 0 ? "Debe registrar al menos un paciente para crear una dieta" : undefined}
         >
           <Plus size={18} weight="bold" />
           {formOpen ? "Cerrar" : "Nueva Dieta"}
@@ -623,16 +631,24 @@ export default function Diets() {
           icon={<BowlFood size={48} weight="thin" />}
           title="Sin dietas"
           description={
-            patientIdFilter != null
-              ? "Este paciente no tiene dietas generadas a&uacute;n."
-              : "No hay dietas generadas a&uacute;n. Crea una nueva usando el formulario."
+            patientsCount === 0
+              ? "Debe registrar al menos un paciente antes de crear una dieta."
+              : patientIdFilter != null
+                ? "Este paciente no tiene dietas generadas a&uacute;n."
+                : "No hay dietas generadas a&uacute;n. Crea una nueva usando el formulario."
           }
           action={
             !formOpen ? (
               <button
                 type="button"
+                disabled={patientsCount === 0}
                 onClick={() => setFormOpen(true)}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors ${
+                  patientsCount === 0
+                    ? "bg-slate-400 cursor-not-allowed"
+                    : "bg-emerald-600 hover:bg-emerald-500"
+                }`}
+                title={patientsCount === 0 ? "Debe registrar al menos un paciente para crear una dieta" : undefined}
               >
                 Nueva Dieta
               </button>
