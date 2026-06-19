@@ -8,6 +8,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from app.core.limiter import limiter
+from app.core.circuit_breaker import CircuitBreakerMiddleware
 
 from app.api.router import api_router
 from app.core.config import settings
@@ -35,6 +36,9 @@ app.add_middleware(
 )
 
 app.add_middleware(SlowAPIMiddleware)
+
+# Circuit breaker — trips on sustained 5xx errors
+app.add_middleware(CircuitBreakerMiddleware)
 
 # Sirve logo-doctora.jpeg y otros assets para que los emails los muestren
 _public_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "public"
