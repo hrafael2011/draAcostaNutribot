@@ -233,13 +233,23 @@ export default function IntakeLinks() {
                 <div className="border-t border-slate-100" />
                 <button
                   type="button"
+                  disabled={patients.length === 0}
                   onClick={() => { setShowFormDropdown(false); handleStartCreate(); }}
-                  className="flex items-start gap-3 w-full px-4 py-3 text-left hover:bg-emerald-50 transition-colors"
+                  className={`flex items-start gap-3 w-full px-4 py-3 text-left transition-colors ${
+                    patients.length === 0
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-emerald-50"
+                  }`}
+                  title={patients.length === 0 ? "No hay pacientes registrados" : undefined}
                 >
                   <span className="text-xl mt-0.5">🔄</span>
                   <div>
                     <p className="text-sm font-semibold text-slate-800">Actualización</p>
-                    <p className="text-xs text-slate-500">Para paciente existente — elige quién</p>
+                    <p className="text-xs text-slate-500">
+                      {patients.length === 0
+                        ? "No hay pacientes registrados aún"
+                        : "Para paciente existente — elige quién"}
+                    </p>
                   </div>
                 </button>
               </div>
