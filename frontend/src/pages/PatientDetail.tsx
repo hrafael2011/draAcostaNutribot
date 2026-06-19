@@ -353,7 +353,7 @@ const profileLabels: Record<string, string> = {
   sleep_quality: "Calidad del sueño",
   sleep_hours: "Horas de sueño",
   budget_level: "Presupuesto",
-  adherence_level: "Adherencia",
+  adherence_level: "Compromiso con la dieta",
   exercise_frequency_per_week: "Ejercicio (días/sem)",
   exercise_type: "Tipo de ejercicio",
   extra_notes: "Notas adicionales",
@@ -1422,7 +1422,7 @@ export default function PatientDetail() {
                 {/* Adherencia */}
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">
-                    Nivel de adherencia esperado
+                    Compromiso con la dieta
                   </label>
                   <select
                     name="adherence_level"
@@ -1563,7 +1563,7 @@ export default function PatientDetail() {
                 )}
                 {renderProfileField("Presupuesto", profile?.budget_level)}
                 {renderProfileField(
-                  "Adherencia",
+                  "Compromiso con la dieta",
                   profile?.adherence_level != null ? `${profile.adherence_level}/5` : null
                 )}
                 {renderProfileField(
