@@ -545,77 +545,59 @@ export default function Diets() {
         </div>
       )}
 
-      {/* ComboBox filter — dropdown with search */}
+      {/* Patient filter — search input with dropdown */}
       <div className="mb-6 relative" ref={filterRef}>
-        <button
-          type="button"
-          onClick={() => { setFilterOpen(!filterOpen); setFilterQuery("") }}
-          className={`flex items-center gap-2 rounded-xl border bg-white px-4 py-2.5 text-sm transition-colors min-w-[260px] ${
-            filterOpen ? "border-emerald-500 ring-2 ring-emerald-500/20" : "border-slate-300 hover:border-slate-400"
-          }`}
-        >
-          {patientIdFilter != null && selectedPatientName ? (
-            <>
-              <span className="flex-1 text-left text-slate-800 font-medium">{selectedPatientName}</span>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); clearFilter() }}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
-            </>
-          ) : (
-            <>
-              <MagnifyingGlass size={16} className="text-slate-400 shrink-0" />
-              <span className="flex-1 text-left text-slate-400">Buscar paciente...</span>
-              <CaretDown size={14} className="text-slate-400 shrink-0" />
-            </>
+        <div className="relative">
+          <MagnifyingGlass
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          />
+          <input
+            type="text"
+            value={patientIdFilter != null && selectedPatientName ? selectedPatientName : filterQuery}
+            onChange={(e) => {
+              setFilterQuery(e.target.value)
+              if (patientIdFilter != null) clearFilter()
+              setFilterOpen(true)
+            }}
+            onFocus={() => setFilterOpen(true)}
+            placeholder="Buscar paciente por nombre..."
+            className="w-full max-w-sm rounded-xl border border-slate-300 py-2.5 pl-10 pr-10 text-sm placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-colors"
+          />
+          {patientIdFilter != null && selectedPatientName && (
+            <button
+              type="button"
+              onClick={clearFilter}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <X size={16} />
+            </button>
           )}
-        </button>
+        </div>
 
         {/* Dropdown */}
-        {filterOpen && (
+        {filterOpen && allPatients.length > 0 && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
-            <div className="absolute z-20 mt-1 w-full max-w-sm rounded-xl border border-slate-200 bg-white shadow-xl">
-              {/* Search input inside dropdown */}
-              <div className="relative border-b border-slate-100 p-2">
-                <MagnifyingGlass size={14} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  autoFocus
-                  value={filterQuery}
-                  onChange={(e) => setFilterQuery(e.target.value)}
-                  placeholder="Escribe para buscar..."
-                  className="w-full rounded-lg border-0 bg-slate-50 py-2 pl-8 pr-3 text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-                />
-              </div>
-              {/* Results */}
-              <div className="max-h-64 overflow-y-auto">
-                {allPatients.length === 0 ? (
-                  <div className="flex items-center justify-center py-6">
-                    <Spinner size={20} className="animate-spin text-slate-400" />
-                  </div>
-                ) : displayedPatients.length > 0 ? (
-                  displayedPatients.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      onClick={() => { handleFilterSelect(p.id, p.first_name, p.last_name); setFilterOpen(false) }}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-slate-50"
-                    >
-                      <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
-                      <div>
-                        <span className="font-medium text-slate-800">{p.first_name} {p.last_name}</span>
-                        {p.city && <span className="ml-1.5 text-xs text-slate-400">{p.city}</span>}
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <p className="px-4 py-6 text-center text-sm text-slate-400">No se encontraron pacientes</p>
-                )}
-              </div>
+            <div className="absolute z-20 mt-1 w-full max-w-sm rounded-xl border border-slate-200 bg-white shadow-xl max-h-64 overflow-y-auto">
+              {displayedPatients.length > 0 ? (
+                displayedPatients.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => { handleFilterSelect(p.id, p.first_name, p.last_name); setFilterOpen(false) }}
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm transition-colors hover:bg-slate-50"
+                  >
+                    <Avatar firstName={p.first_name} lastName={p.last_name} size="sm" />
+                    <div>
+                      <span className="font-medium text-slate-800">{p.first_name} {p.last_name}</span>
+                      {p.city && <span className="ml-1.5 text-xs text-slate-400">{p.city}</span>}
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <p className="px-4 py-6 text-center text-sm text-slate-400">No se encontraron pacientes</p>
+              )}
             </div>
           </>
         )}
