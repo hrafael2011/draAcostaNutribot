@@ -42,13 +42,11 @@ const ALLERGY_OPTIONS = [
 ]
 
 const DIETARY_STYLE_OPTIONS = [
-  "Omnívoro",
-  "Vegetariano",
-  "Vegano",
-  "Sin gluten",
-  "Sin lactosa",
-  "Keto",
-  "Mediterráneo",
+  "Equilibrada",
+  "Baja en carbohidratos",
+  "Alta en carbohidratos",
+  "Alta en proteína",
+  "Mediterránea",
 ]
 
 const EXERCISE_TYPE_OPTIONS = [
@@ -64,9 +62,6 @@ const EXERCISE_TYPE_OPTIONS = [
 const FOODS_AVOIDED_OPTIONS = [
   "Carnes rojas",
   "Cerdo",
-  "Mariscos",
-  "Lácteos",
-  "Gluten",
   "Azúcar procesada",
   "Frituras",
 ]
