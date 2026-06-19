@@ -12,19 +12,11 @@ from app.core.limiter import limiter
 from app.api.router import api_router
 from app.core.config import settings
 from app.core.database import engine, Base
+from app.core.logging_config import setup_logging
 import app.models  # noqa: F401 — registers all ORM models on Base.metadata
 
+setup_logging(settings.is_production)
 logger = logging.getLogger(__name__)
-
-if not logging.getLogger().handlers:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(levelname)s %(name)s %(message)s",
-    )
-
-# Quieter client libraries; app loggers still emit ERROR/WARNING as needed.
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 app = FastAPI(title=settings.APP_NAME)
 app.state.limiter = limiter
