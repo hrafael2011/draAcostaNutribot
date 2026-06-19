@@ -288,6 +288,10 @@ class IntakePublicSubmit(BaseModel):
     city: str
     objective: str
     disliked_foods: Optional[str] = None
+    weight_kg: Optional[float] = None
+    height_cm: Optional[float] = None
+    food_allergies: Optional[str] = None
+    activity_level: Optional[str] = None
 
 
 class IntakeUpdateSubmit(BaseModel):

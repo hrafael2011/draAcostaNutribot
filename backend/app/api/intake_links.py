@@ -193,10 +193,22 @@ async def public_submit(
 
     profile.objective = body.objective
     profile.foods_avoided = body.disliked_foods
+    if body.food_allergies:
+        profile.food_allergies = body.food_allergies
+    if body.activity_level:
+        profile.activity_level = body.activity_level
     profile.completed_by_patient = True
     profile.updated_at = utcnow()
 
-    # NO crear PatientMetrics — el doctor llena medidas en consulta
+    # Crear PatientMetrics si el paciente proporcionó peso/altura
+    if body.weight_kg is not None or body.height_cm is not None:
+        metric = PatientMetrics(
+            patient_id=patient.id,
+            weight_kg=body.weight_kg,
+            height_cm=body.height_cm,
+            source="intake",
+        )
+        db.add(metric)
 
     link.use_count += 1
     link.last_used_at = utcnow()
