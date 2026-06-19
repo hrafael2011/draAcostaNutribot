@@ -71,6 +71,11 @@ class Settings(BaseSettings):
         self.DATABASE_URL = normalize_async_database_url(self.DATABASE_URL)
         if self.is_production and self.JWT_SECRET == "change-me":
             raise ValueError("JWT_SECRET must be configured in production")
+        if self.is_production and self.CORS_ORIGINS.strip() == "*":
+            import logging
+            logging.getLogger(__name__).warning(
+                "CORS_ORIGINS='*' in production — restrict to specific origins via CORS_ORIGINS env var"
+            )
         return self
 
 
