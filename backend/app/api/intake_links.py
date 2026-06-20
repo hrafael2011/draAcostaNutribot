@@ -191,8 +191,10 @@ async def public_submit(
         profile = PatientProfile(patient_id=patient.id)
         db.add(profile)
 
-    profile.objective = body.objective
-    profile.foods_avoided = body.disliked_foods
+    if body.objective:
+        profile.objective = body.objective
+    if body.disliked_foods:
+        profile.foods_avoided = body.disliked_foods
     if body.food_allergies:
         profile.food_allergies = body.food_allergies
     if body.activity_level:

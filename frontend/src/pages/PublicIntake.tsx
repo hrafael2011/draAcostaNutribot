@@ -4,7 +4,6 @@ import { submitIntakeForm, updateIntakeForm, validateIntakeToken } from "../serv
 import type { IntakePublicMeta } from "../types"
 import DatePicker from "../components/ui/DatePicker"
 import LocationSelector from "../components/LocationSelector"
-import { OBJECTIVE_OPTIONS } from "../constants/objectives"
 import ConfirmModal from "../components/ui/ConfirmModal"
 import type { ChangeItem } from "../components/ui/ConfirmModal"
 
@@ -18,7 +17,6 @@ export default function PublicIntake() {
   const [city, setCity] = useState("")
   const [birthDate, setBirthDate] = useState("")
   const [weightKg, setWeightKg] = useState("")
-  const [objective, setObjective] = useState("")
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [confirmChanges, setConfirmChanges] = useState<ChangeItem[]>([])
   const [confirmLoading, setConfirmLoading] = useState(false)
@@ -51,10 +49,6 @@ export default function PublicIntake() {
     const optStr = (k: string) => {
       const v = str(k)
       return v === "" ? null : v
-    }
-    const optFloat = (k: string) => {
-      const v = str(k)
-      return v === "" ? null : Number(v)
     }
 
     setError(null)
@@ -101,14 +95,8 @@ export default function PublicIntake() {
       sex: str("sex"),
       country,
       city,
-      objective: objective,
-      disliked_foods: optStr("foods_avoided"),
       whatsapp: optStr("whatsapp"),
       email: optStr("email") || null,
-      weight_kg: optFloat("weight_kg"),
-      height_cm: optFloat("height_cm"),
-      food_allergies: optStr("food_allergies"),
-      activity_level: optStr("activity_level"),
     }
     if (!country || !city) {
       setError("País y ciudad son obligatorios")
@@ -122,15 +110,9 @@ export default function PublicIntake() {
       { label: "Sexo", newValue: str("sex"), isNew: true },
       { label: "País", newValue: country, isNew: true },
       { label: "Ciudad", newValue: city, isNew: true },
-      { label: "Objetivo", newValue: objective, isNew: true },
     ]
     if (str("whatsapp")) changes.push({ label: "WhatsApp", newValue: str("whatsapp"), isNew: true })
     if (str("email")) changes.push({ label: "Email", newValue: str("email"), isNew: true })
-    if (str("foods_avoided")) changes.push({ label: "Alimentos a evitar", newValue: str("foods_avoided"), isNew: true })
-    if (str("weight_kg")) changes.push({ label: "Peso", newValue: `${str("weight_kg")} kg`, isNew: true })
-    if (str("height_cm")) changes.push({ label: "Altura", newValue: `${str("height_cm")} cm`, isNew: true })
-    if (str("food_allergies")) changes.push({ label: "Alergias alimentarias", newValue: str("food_allergies"), isNew: true })
-    if (str("activity_level")) changes.push({ label: "Nivel de actividad", newValue: str("activity_level"), isNew: true })
 
     setPendingBody(body)
     setConfirmChanges(changes)
@@ -317,59 +299,6 @@ export default function PublicIntake() {
                   </div>
                 </div>
               </section>
-
-              {/* Objetivo y alimentos a evitar — solo register */}
-              {linkType === "register" && (
-                <section>
-                  <h2 className="text-xs font-semibold text-emerald-600 uppercase tracking-wider mb-4">Objetivo y alimentos a evitar</h2>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                        Objetivo principal <span className="text-red-500">*</span>
-                      </label>
-                      <select name="objective" value={objective} onChange={(e) => setObjective(e.target.value)} required
-                        className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors">
-                        {OBJECTIVE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Alimentos que NO te gustan o NO consumes</label>
-                      <p className="text-xs text-slate-500 mb-2">Ej: hígado, cilantro, mariscos, picante...</p>
-                      <textarea name="foods_avoided" rows={2}
-                        className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors resize-none" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Peso (kg)</label>
-                        <input name="weight_kg" type="number" step="0.1" placeholder="Ej. 70.5"
-                          className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1.5">Altura (cm)</label>
-                        <input name="height_cm" type="number" step="0.1" placeholder="Ej. 165"
-                          className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Alergias alimentarias</label>
-                      <input name="food_allergies" placeholder="Ej. gluten, lactosa... o 'ninguna'"
-                        className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1.5">Nivel de actividad</label>
-                      <select name="activity_level"
-                        className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors">
-                        <option value="">Seleccionar...</option>
-                        <option value="Sedentario">Sedentario — sin ejercicio</option>
-                        <option value="Ligero">Ligero — 1-2 días/semana</option>
-                        <option value="Moderado">Moderado — 3-4 días/semana</option>
-                        <option value="Alto">Alto — 5-6 días/semana</option>
-                        <option value="Muy alto">Muy alto — atleta / diario</option>
-                      </select>
-                    </div>
-                  </div>
-                </section>
-              )}
 
               {/* Actualizar peso */}
               {linkType === "update" && (

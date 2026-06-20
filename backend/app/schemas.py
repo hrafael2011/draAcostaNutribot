@@ -286,7 +286,7 @@ class IntakePublicSubmit(BaseModel):
     email: Optional[EmailStr] = None  # No requerido
     country: str
     city: str
-    objective: str
+    objective: Optional[str] = None
     disliked_foods: Optional[str] = None
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
