@@ -1,0 +1,11 @@
+# Railway: use backend Dockerfile when the repo root is connected in the dashboard.
+# CLI from monorepo root: railway up backend --path-as-root [--detach|--ci]
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "backend/Dockerfile"
+
+[deploy]
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10

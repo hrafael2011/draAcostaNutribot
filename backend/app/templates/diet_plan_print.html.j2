@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Plan Nutricional</title>
+  <style>
+    :root {
+      --header-purple: #b09fcb;
+      --row-purple: #d9d4e5;
+      --border: #d1ccd8;
+      --note-bg: #eef0fa;
+      --note-accent: #7d91c1;
+      --note-title: #50628e;
+      --text: #181818;
+    }
+    * { box-sizing: border-box; }
+    @page { size: A4 landscape; margin: 0; }
+    html, body {
+      margin: 0; padding: 0; background: #ffffff; color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      width: 297mm;
+      min-height: 210mm;
+    }
+    /* A4 apaisado: ~2% lateral (297mm), ~7% inferior (210mm); flex reparte el alto */
+    .page {
+      width: 297mm;
+      height: 210mm;
+      max-width: none;
+      padding: 1.5mm calc(297mm * 0.02) calc(210mm * 0.07);
+      box-sizing: border-box;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .page-inner {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+    .top-meta {
+      flex: 0 0 auto;
+      display: flex; justify-content: flex-end; align-items: center;
+      margin-bottom: 1px; padding-right: 8px;
+      font-size: 13px; font-weight: 700; color: #111111;
+    }
+    .plan-energy {
+      flex: 0 0 auto;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #333333;
+      line-height: 1.35;
+      margin: 4px 6px 4px;
+      padding: 0 4px;
+    }
+    .brand {
+      flex: 0 0 auto;
+      display: flex; justify-content: center; align-items: center;
+      gap: 18px;
+      margin: 0;
+      padding-bottom: calc(210mm * 0.02);
+    }
+    .brand-logo {
+      width: 120px; height: auto; max-height: 56px; display: block;
+      object-fit: contain; filter: contrast(1.08) saturate(1.05);
+    }
+    .brand-title { margin: 0; font-size: 18px; font-weight: 700; color: #0b0b0b; }
+    .table-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .table-wrap table {
+      flex: 1 1 auto;
+      min-height: 0;
+      height: 100%;
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    col.day { width: 3.8%; }
+    thead th {
+      padding: 5px 4px; border: 1px solid var(--border);
+      background: var(--header-purple); color: #ffffff;
+      font-size: 14px; font-weight: 700; text-align: center;
+    }
+    tbody td {
+      padding: 5px 7px; border: 1px solid var(--border);
+      font-size: 11px; line-height: 1.32; vertical-align: top;
+      text-align: justify; word-break: normal;
+    }
+    tbody tr:nth-child(even) td { background: var(--row-purple); }
+    tbody tr { height: calc(100% / 7); }
+    td.day-cell {
+      padding: 6px 4px; font-size: 11px; text-align: center; vertical-align: middle;
+    }
+    .note {
+      flex: 0 0 auto;
+      margin-top: 2px;
+      margin-bottom: 0;
+      border-left: 6px solid var(--note-accent);
+      background: var(--note-bg);
+      padding: 6px 12px 5px;
+      font-size: 13px;
+      line-height: 1.28;
+      color: #343434;
+    }
+    .note strong { color: var(--note-title); }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="page-inner">
+      <div class="top-meta">Fecha: {{ fecha }}</div>
+      <section class="brand" aria-label="Encabezado del plan nutricional">
+        {% if logo_data_uri %}
+        <img class="brand-logo" src="{{ logo_data_uri }}" alt="Logo">
+        {% endif %}
+        <h1 class="brand-title">{{ brand_title }}</h1>
+      </section>
+      {% if energy_summary %}<p class="plan-energy">{{ energy_summary }}</p>{% endif %}
+      <div class="table-wrap">
+        <table aria-label="Plan nutricional semanal">
+          <colgroup>
+            <col class="day" style="width: 3.8%;">
+            {% for _ in meal_slots %}
+            <col style="width: {{ meal_col_pct }}%;">
+            {% endfor %}
+          </colgroup>
+          <thead><tr>
+            {% for label in meal_labels %}<th>{{ label }}</th>{% endfor %}
+          </tr></thead>
+          <tbody>
+            {% for row in rows %}
+            <tr>
+              {% for cell in row %}
+              <td{% if loop.first %} class="day-cell"{% endif %}>{{ cell }}</td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">
+        <strong>Recomendaciones:</strong> {{ recommendations_text }}
+      </div>
+    </div>
+  </main>
+</body>
+</html>

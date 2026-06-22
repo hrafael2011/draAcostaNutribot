@@ -10,10 +10,10 @@ A single MCP server that exposes Vercel (REST API) and Railway (GraphQL API) ope
 
 ## Motivation
 
-- The project (`diet_telegram_agent`) deploys backend to Railway and frontend to Vercel.
+- The user deploys multiple projects: backend to Railway, frontend to Vercel, and more coming.
 - Currently, interacting with either platform requires switching between browser dashboards or running CLIs manually.
 - An MCP server lets Claude manage deploys, logs, env vars, and config from within a conversation — faster feedback and fewer context switches.
-- One server, one Docker image, one entry in `mcpServers` config.
+- One server, one Docker image, one entry in `mcpServers` config — reusable across all projects.
 
 ## Architecture
 
@@ -56,7 +56,7 @@ api.vercel.com           backboard.railway.app/graphql
 ## Project Structure
 
 ```
-mcp-vercel-railway/               # Root — could live in this repo or its own
+mcp-vercel-railway/               # Repositorio independiente (github.com/hrafael2011/mcp-vercel-railway)
 ├── Dockerfile
 ├── requirements.txt
 ├── pyproject.toml
@@ -232,6 +232,11 @@ python-dotenv>=1.0.0
 - **Integration tests** — optional; require real tokens (marked with `@pytest.mark.integration`, skipped in CI by default)
 - **No tests that call real Vercel/Railway APIs** unless explicitly opted in
 
-## Open Questions
+## Repo Location
 
-- **Repo location**: Should this live in `diet_telegram_agent/` (monorepo) or its own repository? (Recommendation: subdirectory in this repo, e.g., `mcp-server/`, for now — keeps it close to the project it serves.)
+Repositorio independiente: `github.com/hrafael2011/mcp-vercel-railway`
+
+- Publicado como imagen Docker en GitHub Container Registry (`ghcr.io/hrafael2011/mcp-vercel-railway:latest`)
+- Se usa desde cualquier proyecto añadiéndolo al `settings.json`
+- Desacoplado del ciclo de desarrollo de cualquier proyecto en particular
+- Se comparte entre todos los proyectos del usuario
