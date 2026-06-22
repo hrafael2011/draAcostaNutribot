@@ -27,8 +27,9 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _resolve_logo_path() -> Path | None:
-    if settings.PDF_LOGO_PATH:
-        p = Path(settings.PDF_LOGO_PATH).expanduser()
+    pdf_logo_path = getattr(settings, "PDF_LOGO_PATH", None)
+    if pdf_logo_path:
+        p = Path(pdf_logo_path).expanduser()
         if p.is_file():
             return p
     nitido = _REPO_ROOT / "html_logo" / "logo_nitido.png"

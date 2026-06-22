@@ -11,10 +11,6 @@ from reportlab.lib.units import cm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.models import Diet, Doctor, Patient, PatientMetrics, PatientProfile
-from app.services.diet_export_html import (
-    HtmlPdfExportError,
-    build_official_diet_export_pdf_bytes,
-)
 from app.services.doctor_assistant_service import calc_age
 from app.services.plan_meals import (
     extract_day_meals,
@@ -385,13 +381,21 @@ def build_diet_export_pdf_bytes(
 ) -> bytes:
     """Official patient PDF.
 
-    The HTML renderer is the source of truth for the polished one-page layout.
-    ReportLab remains as a conservative fallback if the browser renderer is not
-    available in a test or degraded runtime.
+    WeasyPrint (via diet_pdf_html) renders the polished one-page layout.
+    ReportLab remains as a conservative fallback for degraded runtimes.
     """
+    # Lazy import to avoid circular dependency (diet_pdf_html imports from diet_export)
+    from app.services.diet_pdf_html import build_diet_export_pdf_bytes_html  # noqa: E402
+
     try:
-        return build_official_diet_export_pdf_bytes(diet, patient=patient)
-    except (HtmlPdfExportError, OSError, subprocess.SubprocessError):
+        return build_diet_export_pdf_bytes_html(
+            diet,
+            patient=patient,
+            profile=profile,
+            metrics=metrics,
+            doctor=doctor,
+        )
+    except (RuntimeError, OSError, subprocess.SubprocessError):
         return _build_diet_export_pdf_bytes_reportlab(
             diet,
             patient=patient,

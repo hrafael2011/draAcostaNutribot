@@ -9,6 +9,19 @@ from app.core.config import settings
 from app.services.plan_meals import normalize_plan_meal_metadata
 
 
+_openai_client: AsyncOpenAI | None = None
+
+
+def _get_openai_client() -> AsyncOpenAI:
+    global _openai_client
+    if _openai_client is None:
+        _openai_client = AsyncOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_BASE_URL,
+        )
+    return _openai_client
+
+
 def _parse_json_response(raw: str) -> dict[str, Any]:
     s = raw.strip()
     if s.startswith("```"):
@@ -64,10 +77,7 @@ async def generate_diet_plan_json(
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is not set")
 
-    client = AsyncOpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL,
-    )
+    client = _get_openai_client()
     system = (
         "Eres un asistente experto en planificación nutricional (no sustituyes criterio médico). "
         "Responde SOLO con JSON válido (sin markdown, sin texto extra). "
@@ -149,10 +159,7 @@ async def recalculate_macros_from_meals(
     if not settings.OPENAI_API_KEY:
         return plan
 
-    client = AsyncOpenAI(
-        api_key=settings.OPENAI_API_KEY,
-        base_url=settings.OPENAI_BASE_URL,
-    )
+    client = _get_openai_client()
 
     days = plan.get("days", [])
     meal_summary_parts = []

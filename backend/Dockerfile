@@ -3,7 +3,13 @@ FROM python:3.12-slim-bookworm
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends chromium fonts-liberation libpq5 \
+    && apt-get install -y --no-install-recommends \
+         libpq5 \
+         libpango-1.0-0 \
+         libpangocairo-1.0-0 \
+         libgdk-pixbuf-2.0-0 \
+         libcairo2 \
+         libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
