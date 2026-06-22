@@ -17,10 +17,13 @@ import DietWizard from "./pages/DietWizard"
 import PublicIntake from "./pages/PublicIntake"
 import NotFound from "./pages/NotFound"
 import Trash from "./pages/Trash"
+import PwaAutoReload from "./components/PwaAutoReload"
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <PwaAutoReload />
+      <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/change-password" element={<ChangePassword />} />
@@ -50,5 +53,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>
+    </>
   )
 }
