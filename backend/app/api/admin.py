@@ -284,7 +284,7 @@ async def list_audit_logs(
     db: AsyncSession = Depends(get_db),
     admin: Doctor = Depends(get_current_admin),
 ):
-    """Devuelve el historial de acciones de administración (solo gestión de usuarios)."""
+    """Returns the history of admin actions (user management only)."""
     # Known technical actions to exclude (diet system, telegram, etc.)
     excluded = {"telegram_unbind", "telegram_bind"}
     q = (

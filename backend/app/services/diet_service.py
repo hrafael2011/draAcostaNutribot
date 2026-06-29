@@ -186,7 +186,7 @@ async def _generate_plan_with_nutrition_engine(
     targets["meals_per_day"] = normalized_meals_per_day
     targets["meal_slots"] = meal_slots_for_count(normalized_meals_per_day)
     if strategy_mode != "auto":
-        # Mantener contexto explícito para redacción del menú (motor sigue siendo autoridad numérica).
+        # Keep explicit context for meal drafting (engine remains numeric authority).
         targets["strategy_mode"] = strategy_mode
     if diet_style:
         targets["diet_style"] = diet_style

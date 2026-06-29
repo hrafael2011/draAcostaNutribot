@@ -212,8 +212,8 @@ async def patch_profile(
     data = body.model_dump(exclude_unset=True)
     for key, value in data.items():
         setattr(profile, key, value)
-    # Si la doctora guarda datos clínicos y el paciente ya había completado
-    # su parte, marcamos la evaluación como completa automáticamente
+    # If the doctor saves clinical data and the patient already completed
+    # their part, mark the evaluation as complete automatically
     if profile.completed_by_patient and profile.completed_at is None:
         profile.completed_at = utcnow()
     profile.updated_at = utcnow()

@@ -1,4 +1,4 @@
-"""Duración total del plan en días (múltiplos de 7); ciclo base semanal en el contenido."""
+"""Total plan duration in days (multiples of 7); weekly cycle in content."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ QUICK_PLAN_DURATION_DAYS: tuple[int, ...] = (
 
 
 class DurationParseError(ValueError):
-    """Entrada de usuario no válida para duración."""
+    """Invalid user input for duration."""
 
 
 def validate_duration_days(value: int) -> int:
@@ -42,7 +42,7 @@ def validate_duration_days(value: int) -> int:
 
 
 def parse_duration_text(text: str) -> int:
-    """Interpreta texto libre del chat (español simple)."""
+    """Parses free text from chat (simple Spanish)."""
     raw = (text or "").strip().lower()
     if raw in (
         "",
@@ -78,7 +78,7 @@ def parse_duration_text(text: str) -> int:
 
 
 def apply_plan_duration_metadata(plan: dict[str, Any], duration_days: int) -> dict[str, Any]:
-    """Añade al JSON del plan metadatos de duración sin romper consumidores legacy."""
+    """Adds duration metadata to plan JSON without breaking legacy consumers."""
     d = validate_duration_days(duration_days)
     out = dict(plan)
     weeks = d // 7
@@ -93,7 +93,7 @@ def apply_plan_duration_metadata(plan: dict[str, Any], duration_days: int) -> di
 
 
 def optional_plan_duration_days(plan: Any) -> int | None:
-    """Duración en el JSON del plan si existe y es válida; si no, None (p. ej. dietas legacy)."""
+    """Duration in plan JSON if present and valid; None otherwise (e.g. legacy diets)."""
     if not isinstance(plan, dict):
         return None
     d = plan.get("plan_duration_days")
@@ -106,6 +106,6 @@ def optional_plan_duration_days(plan: Any) -> int | None:
 
 
 def duration_from_existing_plan(plan: Any) -> int:
-    """Lee duración de un plan ya guardado o devuelve el default."""
+    """Reads duration from a saved plan or returns the default."""
     resolved = optional_plan_duration_days(plan)
     return resolved if resolved is not None else DEFAULT_PLAN_DURATION_DAYS

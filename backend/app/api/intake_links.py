@@ -182,7 +182,7 @@ async def public_submit(
     patient.source = "intake_link"
     patient.updated_at = utcnow()
 
-    # Profile parcial — solo lo que el paciente puede llenar
+    # Partial profile — only what the patient can fill
     prof_result = await db.execute(
         select(PatientProfile).where(PatientProfile.patient_id == patient.id)
     )
@@ -237,7 +237,7 @@ async def public_update(
     body: IntakeUpdateSubmit,
     db: AsyncSession = Depends(get_db),
 ):
-    """Actualizar datos de un paciente existente mediante link de actualización."""
+    """Update an existing patient's data via an update link."""
     result = await db.execute(
         select(PatientIntakeLink).where(PatientIntakeLink.token == token)
     )

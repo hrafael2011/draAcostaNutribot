@@ -177,7 +177,7 @@ def _build_diet_export_pdf_bytes_reportlab(
     metrics: Optional[PatientMetrics] = None,
     doctor: Optional[Doctor] = None,
 ) -> bytes:
-    """PDF para el paciente: encabezado, tabla de comidas con porciones y recomendaciones."""
+    """Patient-facing PDF: header, meal table with portions, and recommendations."""
     buf = BytesIO()
     page_size = landscape(A4)
     doc = SimpleDocTemplate(
@@ -280,7 +280,7 @@ def _build_diet_export_pdf_bytes_reportlab(
 
     story: list[Any] = []
 
-    # ── Encabezado estilo sample ───────────────────────────────────────────
+    # ── Header section ───────────────────────────────────────────────
     story.append(Paragraph(f"<b>Fecha:</b> {_xml_para(fecha)}", style_meta))
 
     # ── Calorías/macros/edad: una sola línea bajo fecha ─
@@ -310,7 +310,7 @@ def _build_diet_export_pdf_bytes_reportlab(
     )
     story.append(Spacer(1, 0.06 * cm))
 
-    # ── Tabla 7 días ─────────────────────────────────────────────────────────
+    # ── 7-day table ─────────────────────────────────────────────────────────
 
     days_data: list[dict] = []
     if isinstance(plan.get("days"), list):
@@ -362,7 +362,7 @@ def _build_diet_export_pdf_bytes_reportlab(
     story.append(meal_table)
     story.append(Spacer(1, 0.15 * cm))
 
-    # ── Recomendaciones ───────────────────────────────────────────────────────
+    # ── Recommendations ───────────────────────────────────────────────────────
     story.append(Paragraph("<b>Recomendaciones generales</b>", style_section))
     for rec in _collect_recommendation_lines(plan):
         story.append(Paragraph(f"• {_xml_para(rec)}", style_rec))

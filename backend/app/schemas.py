@@ -283,7 +283,7 @@ class IntakePublicSubmit(BaseModel):
     birth_date: date
     sex: str
     whatsapp: Optional[str] = None
-    email: Optional[EmailStr] = None  # No requerido
+    email: Optional[EmailStr] = None  # Not required
     country: str
     city: str
     objective: Optional[str] = None
@@ -295,9 +295,9 @@ class IntakePublicSubmit(BaseModel):
 
 
 class IntakeUpdateSubmit(BaseModel):
-    """Campos opcionales para actualización de paciente existente vía link.
-    Sin email (es para contacto/avisos, no se cambia aquí).
-    Sin altura ni datos clínicos (solo el médico modifica eso)."""
+    """Optional fields for updating an existing patient via link.
+    No email (used for contact/notifications — not changed here).
+    No height or clinical data (only the doctor modifies those)."""
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     whatsapp: Optional[str] = None

@@ -69,7 +69,7 @@ def load_email_template(patient_name: str, link_url: str) -> str:
 
 
 async def check_and_send_reminders(db: AsyncSession) -> int:
-    """Envía recordatorios para dietas con N+ días. Retorna cuántos envió."""
+    """Sends reminders for diets older than N days. Returns count sent."""
     threshold = utcnow() - timedelta(days=settings.REMINDER_DAYS)
 
     q = (
