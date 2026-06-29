@@ -126,11 +126,11 @@ export type DoctorOut = {
 
 export type AuditLogEntry = {
   id: number
-  fecha: string
+  date: string
   admin: string
-  accion: string
-  usuario_afectado: string
-  detalle: Record<string, unknown>
+  action: string
+  affected_user: string
+  details: Record<string, unknown>
 }
 
 export type TelegramBindingState = {

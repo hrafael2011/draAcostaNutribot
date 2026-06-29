@@ -62,16 +62,16 @@ export default function AdminAuditLog() {
               {logs.map((log) => (
                 <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">
-                    {new Date(log.fecha).toLocaleString("es-ES")}
+                    {new Date(log.date).toLocaleString("es-ES")}
                   </td>
                   <td className="px-4 py-3 font-medium text-gray-800">
                     {log.admin}
                   </td>
                   <td className="px-4 py-3 text-gray-600 max-w-md">
-                    {log.accion}
+                    {log.action}
                   </td>
                   <td className="px-4 py-3 text-gray-500">
-                    {log.usuario_afectado}
+                    {log.affected_user}
                   </td>
                 </tr>
               ))}

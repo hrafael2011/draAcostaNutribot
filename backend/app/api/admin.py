@@ -311,11 +311,11 @@ async def list_audit_logs(
     return [
         {
             "id": log.id,
-            "fecha": log.created_at.isoformat(),
+            "date": log.created_at.isoformat(),
             "admin": admins[log.doctor_id].full_name if log.doctor_id in admins else "—",
-            "accion": log.action,
-            "usuario_afectado": targets[log.entity_id].full_name if log.entity_id in targets else "—",
-            "detalle": log.payload_json or {},
+            "action": log.action,
+            "affected_user": targets[log.entity_id].full_name if log.entity_id in targets else "—",
+            "details": log.payload_json or {},
         }
         for log in logs
     ]
