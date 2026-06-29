@@ -1,6 +1,6 @@
 import { type ChangeEvent } from "react";
 
-type NoAplicaFieldProps = {
+type OptionalFieldProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -15,7 +15,7 @@ type NoAplicaFieldProps = {
 const INPUT_CLASS =
   "w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-colors";
 
-export default function NoAplicaField({
+export default function OptionalField({
   label,
   value,
   onChange,
@@ -25,7 +25,7 @@ export default function NoAplicaField({
   required = false,
   type = "textarea",
   rows = 2,
-}: NoAplicaFieldProps) {
+}: OptionalFieldProps) {
   const checked = value === "No aplica";
 
   function handleCheckboxChange(e: ChangeEvent<HTMLInputElement>) {

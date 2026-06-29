@@ -1,4 +1,4 @@
-"""Modos auto / guiado / manual del motor nutricional."""
+"""Auto / guided / manual strategy modes for the nutrition engine."""
 
 from datetime import date
 

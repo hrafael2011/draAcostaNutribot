@@ -13,7 +13,7 @@ import { SkeletonCard } from "../components/ui/Skeleton"
 import { useToast } from "../context/ToastContext"
 import type { Patient, PatientMetric, PatientProfile, PatientSummary } from "../types"
 import DatePicker from "../components/ui/DatePicker"
-import NoAplicaField from "../components/ui/NoAplicaField"
+import OptionalField from "../components/ui/OptionalField"
 import WeightInput from "../components/ui/WeightInput"
 import HeightInput from "../components/ui/HeightInput"
 import { OBJECTIVE_OPTIONS } from "../constants/objectives"
@@ -1215,7 +1215,7 @@ export default function PatientDetail() {
                 </div>
 
                 {/* Medicamentos */}
-                <NoAplicaField
+                <OptionalField
                   label="Medicamentos"
                   value={editMedications}
                   onChange={setEditMedications}

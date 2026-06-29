@@ -521,13 +521,13 @@ export default function Diets() {
           {/* instructions */}
           <div className="mb-4">
             <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Instructions for the model (optional)
+              Instrucciones para el modelo (opcional)
             </label>
             <textarea
               value={genInstr}
               onChange={(e) => setGenInstr(e.target.value)}
               rows={3}
-              placeholder="e.g. avoid dairy, budget-friendly"
+              placeholder="ej. evitar lácteos, económico"
               className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm placeholder-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>

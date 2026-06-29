@@ -1,6 +1,6 @@
 """
-E2E ligero contra la app en proceso (sin servidor TCP).
-Requiere PostgreSQL accesible con DATABASE_URL y migraciones aplicadas.
+Lightweight E2E against the running app (no TCP server).
+Requires PostgreSQL accessible via DATABASE_URL with migrations applied.
 """
 import os
 import re
@@ -49,9 +49,9 @@ def _clear_telegram_processed_updates() -> None:
 def _skip_if_no_db_output(msg: str) -> None:
     err = msg.lower()
     if "connection refused" in err or "name or service not known" in err:
-        pytest.skip(f"Base de datos no alcanzable:\n{msg}")
+        pytest.skip(f"Database unreachable:\n{msg}")
     if "password authentication failed" in err:
-        pytest.skip(f"Base de datos — credenciales:\n{msg}")
+        pytest.skip(f"Database — credentials:\n{msg}")
 
 
 @pytest.fixture(scope="module")
@@ -209,7 +209,7 @@ def test_telegram_dieta_and_pdf_commands_disabled(client: TestClient, monkeypatc
         sent_messages.append({"chat_id": chat_id, "text": text, "kwargs": kwargs})
 
     async def fake_send_document(*args, **kwargs) -> None:
-        pytest.fail("No se debe enviar documento con /dieta ni /pdf")
+        pytest.fail("Must not send document with /dieta or /pdf")
 
     from app.services import telegram_handler
 
@@ -259,7 +259,7 @@ def test_telegram_dieta_and_pdf_commands_disabled(client: TestClient, monkeypatc
     assert any(
         "menú" in m["text"].lower() and "genera una dieta" in m["text"].lower()
         for m in sent_messages
-    ), "Debe orientar a menú o lenguaje natural, sin ejecutar /dieta"
+    ), "Should suggest a menu or natural language prompt, without executing /dieta"
     assert not any("Confirmar generación" in m["text"] for m in sent_messages)
 
     n = len(sent_messages)
@@ -276,7 +276,7 @@ def test_telegram_dieta_and_pdf_commands_disabled(client: TestClient, monkeypatc
         },
     )
     new_msgs = sent_messages[n:]
-    assert any("historial" in m["text"].lower() for m in new_msgs), "Debe orientar al historial, sin /pdf"
+    assert any("historial" in m["text"].lower() for m in new_msgs), "Should suggest history view, without /pdf"
     assert any(
         m["kwargs"].get("reply_markup", {}).get("inline_keyboard")
         for m in new_msgs

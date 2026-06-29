@@ -6,7 +6,7 @@ import { useToast } from "../../context/ToastContext";
 import type { Patient } from "../../types";
 import DatePicker from "../ui/DatePicker"
 import LocationSelector from "../LocationSelector";
-import NoAplicaField from "../ui/NoAplicaField";
+import OptionalField from "../ui/OptionalField";
 import WeightInput from "../ui/WeightInput";
 import HeightInput from "../ui/HeightInput";
 import { OBJECTIVE_OPTIONS } from "../../constants/objectives";
@@ -382,25 +382,25 @@ export default function PatientDrawer({ open, onClose, onCreated }: PatientDrawe
                               ))}
                             </select>
                           </div>
-                          <NoAplicaField
+                          <OptionalField
                             label="Enfermedades"
                             value={form.diseases}
                             onChange={(v) => setForm((prev) => ({ ...prev, diseases: v }))}
                             placeholder="Ej. Diabetes tipo 2, Hipertensión"
                           />
-                          <NoAplicaField
+                          <OptionalField
                             label="Medicamentos"
                             value={form.medications}
                             onChange={(v) => setForm((prev) => ({ ...prev, medications: v }))}
                             placeholder="Ej. Metformina 500mg, Losartán 50mg"
                           />
-                          <NoAplicaField
+                          <OptionalField
                             label="Alergias alimentarias"
                             value={form.food_allergies}
                             onChange={(v) => setForm((prev) => ({ ...prev, food_allergies: v }))}
                             placeholder="Ej. Mariscos, Maní"
                           />
-                          <NoAplicaField
+                          <OptionalField
                             label="Alimentos a evitar"
                             value={form.foods_avoided}
                             onChange={(v) => setForm((prev) => ({ ...prev, foods_avoided: v }))}

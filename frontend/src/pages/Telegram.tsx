@@ -35,9 +35,9 @@ export default function Telegram() {
     try {
       const s = await startTelegramBinding()
       setPending(s)
-      setMsg("Open the link on the phone where you use Telegram.")
+      setMsg("Abre el enlace en el teléfono donde usas Telegram.")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not start binding")
+      setError(e instanceof Error ? e.message : "No se pudo iniciar la vinculación")
     }
   }
 
@@ -49,33 +49,33 @@ export default function Telegram() {
     try {
       const s = await resetTelegramBinding()
       setState(s)
-      setMsg("Telegram unlinked.")
+      setMsg("Telegram desvinculado.")
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Reset failed")
+      setError(e instanceof Error ? e.message : "Error al desvincular")
     }
   }
 
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text)
-      setMsg("Copied")
+      setMsg("Copiado")
     } catch {
-      setMsg("Copy manually from the field below")
+      setMsg("Copia manualmente desde el campo de abajo")
     }
   }
 
   if (loading) {
-    return <p>Loading…</p>
+    return <p>Cargando…</p>
   }
 
   return (
     <div style={{ maxWidth: 640 }}>
       <h1 style={{ marginTop: 0 }}>Telegram</h1>
       <p style={{ color: "#555" }}>
-        Link your personal Telegram so you can query patients from the bot. Configure{" "}
-        <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_BOT_USERNAME</code> on the server,
-        set the webhook to <code>POST /api/telegram/webhook</code>, and optionally{" "}
-        <code>TELEGRAM_WEBHOOK_SECRET</code> (must match Telegram&apos;s secret token header).
+        Vincula tu Telegram personal para consultar pacientes desde el bot. Configura{" "}
+        <code>TELEGRAM_BOT_TOKEN</code> y <code>TELEGRAM_BOT_USERNAME</code> en el servidor,
+        establece el webhook en <code>POST /api/telegram/webhook</code>, y opcionalmente{" "}
+        <code>TELEGRAM_WEBHOOK_SECRET</code> (debe coincidir con el token secreto de Telegram).
       </p>
       {error && <p style={{ color: "#b00020" }}>{error}</p>}
       {msg && <p style={{ color: "#0a0" }}>{msg}</p>}
@@ -90,15 +90,15 @@ export default function Telegram() {
           }}
         >
           <p style={{ marginTop: 0 }}>
-            <strong>Status:</strong> {state.linked ? "Linked" : "Not linked"}
+            <strong>Estado:</strong> {state.linked ? "Vinculado" : "No vinculado"}
           </p>
           {state.linked && (
             <>
               <p>
-                <strong>User ID:</strong> {state.telegram_user_id ?? "—"}
+                <strong>ID de usuario:</strong> {state.telegram_user_id ?? "—"}
               </p>
               <p>
-                <strong>Username:</strong> @{state.telegram_username ?? "—"}
+                <strong>Nombre de usuario:</strong> @{state.telegram_username ?? "—"}
               </p>
             </>
           )}
@@ -112,10 +112,10 @@ export default function Telegram() {
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
         <button type="button" onClick={onGenerate} disabled={!!state?.linked}>
-          Generate link
+          Generar enlace
         </button>
         <button type="button" onClick={onReset} disabled={!state?.linked}>
-          Unlink Telegram
+          Desvincular Telegram
         </button>
         <button
           type="button"
@@ -126,7 +126,7 @@ export default function Telegram() {
               .finally(() => setLoading(false))
           }}
         >
-          Refresh status
+          Actualizar estado
         </button>
       </div>
 
@@ -142,14 +142,14 @@ export default function Telegram() {
           </p>
           <p style={{ fontSize: 14, wordBreak: "break-all" }}>{pending.deep_link}</p>
           <button type="button" onClick={() => copy(pending.deep_link)}>
-            Copy link
+            Copiar enlace
           </button>
           <p style={{ fontSize: 13, color: "#666" }}>
             Caducidad (técnica): {pending.expires_at}
           </p>
           <p style={{ fontSize: 13, color: "#666" }}>
-            After linking, try <code>/ayuda</code>, <code>/pacientes</code>, or{" "}
-            <code>/ficha NAME</code> in the bot.
+            Después de vincular, prueba <code>/ayuda</code>, <code>/pacientes</code>, o{" "}
+            <code>/ficha NOMBRE</code> en el bot.
           </p>
         </div>
       )}

@@ -1,4 +1,4 @@
-"""Export PDF/TXT: bloque de calorías, privacidad (nota del doctor y perfil clínico)."""
+"""PDF/TXT export: calorie block, privacy (doctor's note and clinical profile)."""
 
 from __future__ import annotations
 
