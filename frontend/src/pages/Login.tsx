@@ -55,13 +55,13 @@ export default function Login() {
         <div className="mb-8 text-center">
           <img
             src="/logo-login.png"
-            alt="Dra. Acosta Nutribot"
+            alt="Dra. Acosta Nutrisoft"
             className="mx-auto mb-4"
             width={180}
             height={174}
           />
           <h1 className="text-xl font-bold text-gray-800">Dra. Acosta</h1>
-          <p className="text-sm text-gray-500">Nutribot — Gestión Nutricional</p>
+          <p className="text-sm text-gray-500">Nutrisoft — Gestión Nutricional</p>
         </div>
 
         {/* Login form */}

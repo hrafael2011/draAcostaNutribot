@@ -51,7 +51,7 @@ export default function AdminLogin() {
         <div className="mb-8 text-center">
           <img
             src="/logo-login.png"
-            alt="Dra. Acosta Nutribot"
+            alt="Dra. Acosta Nutrisoft"
             className="mx-auto mb-4"
             width={180}
             height={174}

@@ -10,8 +10,8 @@ export default defineConfig({
     VitePWA({
       registerType: "prompt",
       manifest: {
-        name: "Dra. Acosta Nutribot",
-        short_name: "Nutribot",
+        name: "Dra. Acosta Nutrisoft",
+        short_name: "Nutrisoft",
         description: "Plataforma profesional de gestión nutricional",
         theme_color: "#059669",
         background_color: "#ffffff",

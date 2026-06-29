@@ -297,12 +297,12 @@ function DesktopSidebar({
       <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-4">
         <img
           src="/logo-sidebar.png"
-          alt="Nutribot"
+          alt="Nutrisoft"
           width={48}
           height={46}
           className="rounded-lg shadow-sm"
         />
-        <span className="text-lg font-bold text-slate-800">Nutribot</span>
+        <span className="text-lg font-bold text-slate-800">Nutrisoft</span>
       </div>
 
       {/* Navigation */}
@@ -362,12 +362,12 @@ function MobileSidebar({
         <div className="flex items-center gap-3">
           <img
             src="/logo-sidebar.png"
-            alt="Nutribot"
+            alt="Nutrisoft"
             width={40}
             height={38}
             className="rounded-lg shadow-sm"
           />
-          <span className="text-lg font-bold text-slate-800">Nutribot</span>
+          <span className="text-lg font-bold text-slate-800">Nutrisoft</span>
         </div>
         <button
           type="button"
