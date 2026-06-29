@@ -49,7 +49,7 @@ Current local container behavior:
 
 Vercel project:
 
-- `dra-acosta-nutribot`
+- `dra-acosta-nutrisoft`
 
 Environment routing:
 

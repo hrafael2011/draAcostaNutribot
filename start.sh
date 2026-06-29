@@ -22,7 +22,7 @@ trap cleanup EXIT
 
 echo ""
 echo -e "${CYAN}══════════════════════════════════════${NC}"
-echo -e "${CYAN}  Dra. Acosta Nutribot — Dev Launcher ${NC}"
+echo -e "${CYAN}  Dra. Acosta Nutrisoft — Dev Launcher ${NC}"
 echo -e "${CYAN}══════════════════════════════════════${NC}"
 echo ""
 
