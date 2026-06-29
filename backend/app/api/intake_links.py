@@ -101,18 +101,18 @@ async def public_validate(token: str, db: AsyncSession = Depends(get_db)):
     )
     link = result.scalar_one_or_none()
     if link is None:
-        return IntakeLinkPublicMeta(valid=False, message="Invalid link")
+        return IntakeLinkPublicMeta(valid=False, message="Enlace inválido")
     now = utcnow()
     if link.status == "revoked":
-        return IntakeLinkPublicMeta(valid=False, message="Link revoked")
+        return IntakeLinkPublicMeta(valid=False, message="Enlace revocado")
     if link.expires_at < now:
         return IntakeLinkPublicMeta(
             valid=False,
             expires_at=link.expires_at,
-            message="Link expired",
+            message="Enlace expirado",
         )
     if link.use_count >= link.max_uses:
-        return IntakeLinkPublicMeta(valid=False, message="Link already used")
+        return IntakeLinkPublicMeta(valid=False, message="Enlace ya utilizado")
     patient = await db.get(Patient, link.patient_id) if link.patient_id else None
     return IntakeLinkPublicMeta(
         valid=True,
@@ -136,15 +136,15 @@ async def public_submit(
     if link is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invalid link",
+            detail="Enlace inválido",
         )
     now = utcnow()
     if link.status == "revoked":
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link revoked")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Enlace revocado")
     if link.expires_at < now:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link expired")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Enlace expirado")
     if link.use_count >= link.max_uses:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link already used")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Enlace ya utilizado")
 
     if link.link_type == "register" and link.patient_id is None:
         # Create new patient for registration flow
@@ -243,18 +243,18 @@ async def public_update(
     )
     link = result.scalar_one_or_none()
     if link is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid link")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enlace inválido")
     now = utcnow()
     if link.status == "revoked":
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link revoked")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Enlace revocado")
     if link.expires_at < now:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link expired")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Enlace expirado")
     if link.use_count >= link.max_uses:
-        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Link already used")
+        raise HTTPException(status_code=status.HTTP_410_GONE, detail="Enlace ya utilizado")
     if link.patient_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This link is for new patient registration, use POST /submit",
+            detail="Este enlace es para registro de nuevos pacientes, usa POST /submit",
         )
 
     patient = await db.get(Patient, link.patient_id)
