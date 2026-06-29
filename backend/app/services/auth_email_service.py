@@ -91,4 +91,4 @@ def send_welcome_email(to_email: str, full_name: str, temp_password: str, login_
     </div>
     """
     html = _base_html(content)
-    return send_email_sync(to_email, "Bienvenido a Nutribot — Dra. Acosta", html)
+    return send_email_sync(to_email, "Bienvenido a Nutrisoft — Dra. Acosta", html)

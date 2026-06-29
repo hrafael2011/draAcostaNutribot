@@ -17,7 +17,7 @@ def main() -> None:
     draw = ImageDraw.Draw(img)
     draw.rounded_rectangle([4, 4, w - 5, h - 5], radius=18, fill=(30, 58, 95, 255))
     font = ImageFont.load_default()
-    title = "Dra. Acosta · Nutribot"
+    title = "Dra. Acosta · Nutrisoft"
     bbox = draw.textbbox((0, 0), title, font=font)
     tw = bbox[2] - bbox[0]
     th = bbox[3] - bbox[1]

@@ -13,7 +13,7 @@ from app.models import Doctor
 from sqlalchemy import select
 
 async def main():
-    email = os.getenv("EMAIL", "admin@nutribot.com")
+    email = os.getenv("EMAIL", "admin@nutrisoft.com")
 
     async with AsyncSessionLocal() as db:
         doc = (await db.execute(select(Doctor).where(Doctor.email == email))).scalar_one_or_none()
