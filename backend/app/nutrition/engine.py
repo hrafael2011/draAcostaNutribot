@@ -1,4 +1,4 @@
-"""Cálculo determinista: BMR (Mifflin–St Jeor), TDEE, IMC, calorías objetivo y macros."""
+"""Deterministic calculation: BMR (Mifflin-St Jeor), TDEE, BMI, target calories, and macros."""
 
 from __future__ import annotations
 
@@ -213,8 +213,8 @@ def _apply_guided_preferences(
 
 def compute_nutrition(nutrition_input: NutritionInput) -> NutritionResult:
     """
-    Ejecuta el pipeline de cálculo sobre entradas ya normalizadas.
-    No llama a BD ni a LLM.
+    Executes the calculation pipeline on already-normalized inputs.
+    Does not call DB or LLM.
     """
     c = nutrition_input.calculation
     prefs = nutrition_input.preferences

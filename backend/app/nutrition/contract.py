@@ -9,7 +9,7 @@ ENGINE_SCHEMA_VERSION = "1.0"
 
 
 class NormalizedActivityLevel(str, Enum):
-    """Nivel de actividad normalizado para factor TDEE."""
+    """Normalized activity level for TDEE factor calculation."""
 
     SEDENTARY = "sedentary"
     LIGHT = "light"
@@ -19,7 +19,7 @@ class NormalizedActivityLevel(str, Enum):
 
 
 class NormalizedNutritionGoal(str, Enum):
-    """Objetivo nutricional interno (post-mapeo desde texto de perfil)."""
+    """Internal nutrition goal (post-mapping from profile text)."""
 
     FAT_LOSS = "fat_loss"
     MAINTENANCE = "maintenance"
@@ -48,7 +48,7 @@ class MacroPreferenceLevel(str, Enum):
 
 
 class MedicalConditionCode(str, Enum):
-    """Condiciones con reglas explícitas en el motor; otras vía flujo de revisión."""
+    """Conditions with explicit engine rules; others go through review flow."""
 
     DIABETES = "diabetes"
     HYPERTENSION = "hypertension"
@@ -58,7 +58,7 @@ class MedicalConditionCode(str, Enum):
 
 
 class SexForBmr(str, Enum):
-    """Sexo biológico para Mifflin–St Jeor (valores esperados tras normalización)."""
+    """Biological sex for Mifflin-St Jeor equation (values expected after normalization)."""
 
     MALE = "male"
     FEMALE = "female"
@@ -72,7 +72,7 @@ class NutritionAlertSeverity(str, Enum):
 
 @dataclass(frozen=True)
 class NutritionAlert:
-    """Alerta clínica o de seguridad emitida por el motor (texto en español para UI)."""
+    """Clinical or safety alert emitted by the engine (UI text in Spanish)."""
 
     code: str
     severity: NutritionAlertSeverity
@@ -82,7 +82,7 @@ class NutritionAlert:
 
 @dataclass
 class PatientContextualFactors:
-    """Capa contextual: no altera fórmulas base; alimenta composición del plan y recomendaciones."""
+    """Contextual layer: does not alter base formulas; feeds plan composition and recommendations."""
 
     stress_level: Optional[int] = None
     sleep_quality: Optional[int] = None
@@ -100,7 +100,7 @@ class PatientContextualFactors:
 
 @dataclass
 class NutritionCalculationInput:
-    """Entradas mínimas para BMR, TDEE, IMC y reparto calórico."""
+    """Minimum inputs for BMR, TDEE, BMI, and caloric distribution."""
 
     weight_kg: float
     height_cm: float
@@ -140,7 +140,7 @@ class NutritionPreferences:
 
 @dataclass
 class NutritionInput:
-    """Contrato completo de entrada al motor: cálculo + contexto + trazabilidad."""
+    """Complete engine input contract: calculation + context + traceability."""
 
     calculation: NutritionCalculationInput
     contextual: PatientContextualFactors = field(default_factory=PatientContextualFactors)
@@ -151,7 +151,7 @@ class NutritionInput:
 
 @dataclass(frozen=True)
 class NutritionResult:
-    """Salida determinista del motor; la fuente oficial de números para prompt y plan."""
+    """Deterministic engine output; the official source of numbers for prompt and plan."""
 
     engine_schema_version: str
     bmr_kcal: Optional[float] = None
@@ -176,7 +176,7 @@ class NutritionResult:
         return any(a.blocks_generation for a in self.alerts)
 
     def to_plan_engine_dict(self) -> dict[str, Any]:
-        """Subdocumento sugerido para structured_plan_json['nutrition_engine']."""
+        """Suggested subdocument for structured_plan_json['nutrition_engine']."""
         return {
             "engine_schema_version": self.engine_schema_version,
             "bmr_kcal": self.bmr_kcal,

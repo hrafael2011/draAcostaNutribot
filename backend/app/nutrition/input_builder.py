@@ -1,4 +1,4 @@
-"""Construye NutritionInput desde modelos ORM (sin LLM)."""
+"""Builds NutritionInput from ORM models (no LLM involvement)."""
 
 from __future__ import annotations
 

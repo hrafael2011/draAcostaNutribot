@@ -1,4 +1,4 @@
-"""Integra la salida del motor en structured_plan_json y payload para el LLM."""
+"""Integrates engine output into structured_plan_json and LLM payload."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from app.nutrition.contract import NutritionInput, NutritionResult
 
 
 def nutrition_targets_for_llm(result: NutritionResult) -> dict[str, Any]:
-    """Objeto que recibe el modelo: cifras oficiales + alertas para redacción del menú."""
+    """Object the model receives: official figures + alerts for meal drafting."""
     return {
         "authoritative": True,
         "instruction_es": (
@@ -53,7 +53,7 @@ def merge_nutrition_into_plan(
     *,
     nutrition_input: Optional[NutritionInput] = None,
 ) -> dict[str, Any]:
-    """Enriquece el JSON del plan con el motor; sobrescribe calorías y macros del LLM."""
+    """Enriches the plan JSON with engine values; overrides LLM calories and macros."""
     out = dict(plan)
     if nutrition_result.target_daily_calories is not None:
         out["daily_calories"] = nutrition_result.target_daily_calories

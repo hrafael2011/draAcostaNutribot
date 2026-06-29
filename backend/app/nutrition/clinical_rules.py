@@ -1,4 +1,4 @@
-"""Reglas clínicas básicas no sustitutivas: ajustes conservadores, alertas y trazabilidad."""
+"""Basic non-substitutive clinical rules: conservative adjustments, alerts, and traceability."""
 
 from __future__ import annotations
 
