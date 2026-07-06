@@ -22,8 +22,8 @@ from app.services.plan_meals import (
 )
 
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
-# backend/app/services -> parents[3] = repo root (diet_telegram_agent)
-_REPO_ROOT = Path(__file__).resolve().parents[3]
+# backend/app/services/diet_pdf_html.py -> parent.parent = backend/app/
+_APP_DIR = Path(__file__).resolve().parent.parent
 
 
 def _resolve_logo_path() -> Path | None:
@@ -32,10 +32,12 @@ def _resolve_logo_path() -> Path | None:
         p = Path(pdf_logo_path).expanduser()
         if p.is_file():
             return p
-    nitido = _REPO_ROOT / "html_logo" / "logo_nitido.png"
+    # Primary: real logo shipped inside the Docker image (always available)
+    nitido = _APP_DIR / "assets" / "logo_nitido.png"
     if nitido.is_file():
         return nitido
-    fallback = Path(__file__).resolve().parent.parent / "assets" / "logo.png"
+    # Fallback: auto-generated logo (dark rectangle with PIL default font)
+    fallback = _APP_DIR / "assets" / "logo.png"
     if fallback.is_file():
         return fallback
     return None

@@ -10,6 +10,7 @@ RUN apt-get update \
          libgdk-pixbuf-2.0-0 \
          libcairo2 \
          libglib2.0-0 \
+         fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

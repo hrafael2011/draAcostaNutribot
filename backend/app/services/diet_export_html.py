@@ -22,7 +22,7 @@ from app.services.plan_meals import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
-LOGO_PATH = ROOT / "samples" / "html_logo" / "logo_nitido.png"
+LOGO_PATH = ROOT / "assets" / "logo_nitido.png"
 PDF_TMP_ROOT = ROOT / ".tmp_pdf"
 
 
