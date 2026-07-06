@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
     VitePWA({
-      registerType: "prompt",
+      registerType: "autoUpdate",
       manifest: {
         name: "Dra. Acosta Nutrisoft",
         short_name: "Nutrisoft",
@@ -39,6 +39,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,webp}"],
         runtimeCaching: [
           {
