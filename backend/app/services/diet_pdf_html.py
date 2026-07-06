@@ -24,6 +24,8 @@ from app.services.plan_meals import (
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates"
 # backend/app/services/diet_pdf_html.py -> parent.parent = backend/app/
 _APP_DIR = Path(__file__).resolve().parent.parent
+# _APP_DIR.parent.parent = repo root (used by WeasyPrint base_url)
+_REPO_ROOT = _APP_DIR.parent.parent
 
 
 def _resolve_logo_path() -> Path | None:
